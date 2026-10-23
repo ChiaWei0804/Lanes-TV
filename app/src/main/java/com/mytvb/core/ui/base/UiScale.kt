@@ -99,9 +99,19 @@ object UiScale {
     /**
      * [btr-hardening] 若 density 已偏離目標值（被系統重設），記錄來源並重新套用；未偏離則什麼都不做。
      */
+    @Volatile private var lastW = -1
+    @Volatile private var lastH = -1
+    @Volatile private var lastPercent = -1
+    @Volatile private var lastTarget = 0f
+
     fun ensure(resources: Resources, source: String) {
         val metrics = resources.displayMetrics
-        val target = designScale(metrics.widthPixels, metrics.heightPixels) * scale()
+        // 熱路徑（每個 View 都會呼叫）：螢幕與檔位沒變就用快取的目標值
+        if (metrics.widthPixels != lastW || metrics.heightPixels != lastH || cachedPercent != lastPercent) {
+            lastTarget = designScale(metrics.widthPixels, metrics.heightPixels) * scale()
+            lastW = metrics.widthPixels; lastH = metrics.heightPixels; lastPercent = cachedPercent
+        }
+        val target = lastTarget
         if (kotlin.math.abs(metrics.density - target) < 0.01f) return
         AppLog.w(TAG, "density drift at $source: current=${metrics.density} dpi=${metrics.densityDpi} target=$target screen=${metrics.widthPixels}x${metrics.heightPixels}")
         apply(resources)

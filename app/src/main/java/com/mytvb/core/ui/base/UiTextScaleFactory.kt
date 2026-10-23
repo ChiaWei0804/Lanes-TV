@@ -50,6 +50,10 @@ object UiTextScaleFactory {
     }
 
     private fun createView(context: Context, attrs: AttributeSet, name: String): View? {
+        // [btr-hardening] 每個 View 建立前檢查 density：播放器關閉後系統會把 density
+        // 重設成電視原生值（實測 1.0 → 2.0），之後才建立的 View 會整個放大。
+        UiScale.ensure(context.resources, "inflate:$name")
+        UiScale.ensure(context.applicationContext.resources, "application")
         if (name == "TextView" || name == APPCOMPAT_TEXT_VIEW) {
             return ScaledTextView(context, attrs).apply { syncFromInflation() }
         }
