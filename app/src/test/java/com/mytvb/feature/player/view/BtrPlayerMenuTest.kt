@@ -76,6 +76,9 @@ class BtrPlayerMenuTest {
         click(MyPlayerSettingView.ITEM_BTR_MODE)
         click(1) // overseas
         assertEquals(BtrCdnMode.OVERSEAS, BtrSettingsStore.load().mode)
+        click(MyPlayerSettingView.ITEM_BTR_MODE)
+        click(3) // auto
+        assertEquals(BtrCdnMode.AUTO, BtrSettingsStore.load().mode)
         click(MyPlayerSettingView.ITEM_BTR_THREADS)
         click(3) // 32
         assertEquals(32, BtrSettingsStore.load().concurrency)

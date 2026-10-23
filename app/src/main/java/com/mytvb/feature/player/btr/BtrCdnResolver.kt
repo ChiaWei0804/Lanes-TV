@@ -35,6 +35,9 @@ internal object BtrCdnResolver {
         "cn-hk-eq-01-03.bilivideo.com"
     )
 
+    /** 自動模式的節點：海外在前、大陸在後（與 BTR 的 GLOBAL_HOSTS 相同順序）。 */
+    private val globalHosts = overseasHosts + mainlandHosts
+
     fun expand(primaryUrl: String, backupUrls: List<String>, mode: Mode = Mode.MAINLAND): List<String> {
         val originals = buildList {
             if (primaryUrl.isNotBlank()) add(primaryUrl)
@@ -48,6 +51,7 @@ internal object BtrCdnResolver {
             BtrCdnMode.OVERSEAS -> overseasHosts
             BtrCdnMode.CUSTOM -> settings.customHosts.ifEmpty { mainlandHosts }
             BtrCdnMode.MAINLAND -> mainlandHosts
+            BtrCdnMode.AUTO -> globalHosts
         }
         val donor = originals.firstOrNull { !isAkamai(it) }
         val synthetic = if (donor != null) hosts.mapNotNull { swapHost(donor, it) }
@@ -57,6 +61,7 @@ internal object BtrCdnResolver {
             when {
                 settings.mode == BtrCdnMode.CUSTOM && settings.customHosts.isNotEmpty() -> host in hosts
                 settings.mode == BtrCdnMode.OVERSEAS -> host !in mainlandHosts
+                settings.mode == BtrCdnMode.AUTO -> host in globalHosts
                 else -> host in mainlandHosts
             }
         }

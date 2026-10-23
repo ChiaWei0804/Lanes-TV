@@ -7,10 +7,12 @@ import org.koin.mp.KoinPlatform
 enum class BtrCdnMode(val value: String) {
     MAINLAND("mainland"),
     OVERSEAS("overseas"),
-    CUSTOM("custom");
+    CUSTOM("custom"),
+    /** [btr-hardening] 自動：海外 + 大陸節點全部列入，由 BTR 測速後把影片分給快的節點（同 Lanes 的 Auto）。 */
+    AUTO("auto");
 
     companion object {
-        fun from(value: String?): BtrCdnMode = entries.firstOrNull { it.value == value } ?: MAINLAND
+        fun from(value: String?): BtrCdnMode = entries.firstOrNull { it.value == value } ?: AUTO
     }
 }
 
@@ -25,7 +27,7 @@ enum class BtrTakeoverMode(val value: String) {
 
 data class BtrSettings(
     val enabled: Boolean = true,
-    val mode: BtrCdnMode = BtrCdnMode.MAINLAND,
+    val mode: BtrCdnMode = BtrCdnMode.AUTO,
     val customHosts: List<String> = emptyList(),
     val concurrency: Int = 8,
     val autoConcurrency: Boolean = true,

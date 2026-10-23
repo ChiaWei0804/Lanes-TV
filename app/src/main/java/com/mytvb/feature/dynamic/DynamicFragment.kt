@@ -293,6 +293,16 @@ class DynamicFragment : BaseFragment<FragmentDynamicBinding>(), MainTabFocusTarg
                 viewModel.followingList.collectLatest { list ->
                     AppLog.i(TAG, "DYN D7 followingList collected items=${list.size}")
                     upAdapter.setData(list)
+                    // [btr-hardening] 頭像原本只在右側影片列表「首幀」後才開始載入；
+                    // 影片列表為空或走快取路徑時首幀回呼不會觸發，UP 頭像就永遠是預設圖。
+                    // 這裡加一個保底：UP 列表有資料後 1.5 秒內一定開啟頭像載入。
+                    if (list.isNotEmpty()) {
+                        binding.recyclerViewLeft.postDelayed({
+                            if (isAdded && view != null && ::upAdapter.isInitialized) {
+                                upAdapter.setAvatarLoadsEnabled(true)
+                            }
+                        }, 1500L)
+                    }
                     if (list.isNotEmpty() && currentUpId == 0L) {
                         currentUpId = list[0].mid
                         upAdapter.setSelectedPosition(0)

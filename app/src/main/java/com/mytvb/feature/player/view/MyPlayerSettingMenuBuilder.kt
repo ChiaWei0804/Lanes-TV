@@ -58,7 +58,7 @@ internal class MyPlayerSettingMenuBuilder(
         val liveLines: List<LiveLineInfo> = emptyList(),
         val currentLiveLineIndex: Int = 0,
         val btrEnabled: Boolean = true,
-        val btrMode: BtrCdnMode = BtrCdnMode.MAINLAND,
+        val btrMode: BtrCdnMode = BtrCdnMode.AUTO,
         val btrCustomHosts: List<String> = emptyList(),
         val btrConcurrency: Int = 8,
         val btrAutoConcurrency: Boolean = true,
@@ -160,6 +160,7 @@ internal class MyPlayerSettingMenuBuilder(
         BtrCdnMode.MAINLAND -> "大陆 CDN"
         BtrCdnMode.OVERSEAS -> "海外 CDN"
         BtrCdnMode.CUSTOM -> "自定义"
+        BtrCdnMode.AUTO -> "自动"
     }
 
     fun buildVideoQualityMenu(state: PanelState): List<PlayerSettingRow> {

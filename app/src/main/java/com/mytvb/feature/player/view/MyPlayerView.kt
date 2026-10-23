@@ -3059,6 +3059,7 @@ class MyPlayerView @JvmOverloads constructor(
             com.mytvb.feature.player.btr.BtrCdnMode.MAINLAND -> "大陆"
             com.mytvb.feature.player.btr.BtrCdnMode.OVERSEAS -> "海外"
             com.mytvb.feature.player.btr.BtrCdnMode.CUSTOM -> "自定义"
+            com.mytvb.feature.player.btr.BtrCdnMode.AUTO -> "自动"
         }
         val workers = if (settings.autoConcurrency) "自动（当前 ${BtrAutoConcurrency.threads()}）" else settings.concurrency.toString()
         val workState = when {

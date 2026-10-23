@@ -178,7 +178,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         private val TEEN_TIME_OPTIONS = arrayOf("0", "1") + (10..120 step 10).map { it.toString() }
 
         private val HOME_START_PAGE_OPTIONS = arrayOf("推荐", "热门", "番剧", "影视", "动态")
-        private val BTR_MODE_OPTIONS = arrayOf("大陆 CDN", "海外 CDN", "自定义")
+        private val BTR_MODE_OPTIONS = arrayOf("自动", "大陆 CDN", "海外 CDN", "自定义")
         // [btr-hardening] 手動執行緒上限 128 → 32，降低觸發 B 站風控的機率
         private val BTR_THREAD_OPTIONS = arrayOf("4", "8", "16", "32")
         private val BTR_TAKEOVER_OPTIONS = arrayOf("全接管", "兼容模式")
@@ -1446,6 +1446,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         val settings = BtrSettingsStore.load()
         updateBtrItem(KEY_BTR_ENABLED, if (settings.enabled) "开" else "关", labelOf(if (settings.enabled) "开" else "关"))
         updateBtrItem(KEY_BTR_MODE, settings.mode.value, when (settings.mode) {
+            BtrCdnMode.AUTO -> "自动"
             BtrCdnMode.MAINLAND -> "大陆 CDN"
             BtrCdnMode.OVERSEAS -> "海外 CDN"
             BtrCdnMode.CUSTOM -> "自定义"
@@ -1469,11 +1470,12 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         val item = itemOf(KEY_BTR_MODE) ?: return
         val current = BtrSettingsStore.load().mode
         showChoiceDialog(item.title, when (current) {
+            BtrCdnMode.AUTO -> "自动"
             BtrCdnMode.MAINLAND -> "大陆 CDN"
             BtrCdnMode.OVERSEAS -> "海外 CDN"
             BtrCdnMode.CUSTOM -> "自定义"
         }, BTR_MODE_OPTIONS) { selected ->
-            val mode = when (selected) { "海外 CDN" -> BtrCdnMode.OVERSEAS; "自定义" -> BtrCdnMode.CUSTOM; else -> BtrCdnMode.MAINLAND }
+            val mode = when (selected) { "自动" -> BtrCdnMode.AUTO; "海外 CDN" -> BtrCdnMode.OVERSEAS; "自定义" -> BtrCdnMode.CUSTOM; else -> BtrCdnMode.MAINLAND }
             BtrSettingsStore.saveMode(mode)
             updateBtrItem(KEY_BTR_MODE, mode.value, selected)
             BtrCdnResolver.enabled = BtrSettingsStore.load().enabled
