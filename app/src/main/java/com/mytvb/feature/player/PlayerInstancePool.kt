@@ -25,21 +25,25 @@ import com.mytvb.feature.player.settings.PlayerSettingsStore
 object PlayerInstancePool {
     private const val TAG = "PlayerInstancePool"
     private const val IDLE_RELEASE_DELAY_MS = 45_000L
-    private const val TARGET_BUFFER_BYTES = 20 * 1024 * 1024 // 20MB
+    // [btr-hardening] 緩衝資料放在 Java heap（Google TV Streamer 上限 384MB），以 heap 比例設位元組上限，
+    // 並且不讓時間門檻凌駕位元組上限，避免高碼率長緩衝 OOM。碼率夠高時會先碰到這個上限，緩衝停在 120 秒以下。
+    private fun targetBufferBytes(): Int =
+        (Runtime.getRuntime().maxMemory() * 0.45).toLong()
+            .coerceIn(20L * 1024 * 1024, 200L * 1024 * 1024).toInt()
 
     // PCM AudioTrack 缓冲：日志里 500ms 缓冲出现 underrun，放宽到 750-2000ms 抵御软解/GC 抢占。
     private const val MIN_PCM_BUFFER_DURATION_US = 750_000
     private const val MAX_PCM_BUFFER_DURATION_US = 2_000_000
 
-    // 点播目标提前缓冲 45 秒；低于目标即补充，避免等到只剩十几秒。
-    private const val WIFI_MIN_BUFFER_MS = 45_000
-    private const val WIFI_MAX_BUFFER_MS = 45_000
+    // [btr-hardening] 点播缓冲目标 120 秒；补满后暂停，低于 60 秒才恢复下载。BTR Debug 也读这两个值。
+    internal const val WIFI_MIN_BUFFER_MS = 60_000
+    internal const val WIFI_MAX_BUFFER_MS = 120_000
     private const val WIFI_BUFFER_FOR_PLAYBACK_MS = 6_000
     private const val WIFI_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 6_000
 
     // 移动数据下的缓冲参数：更保守，减少卡顿
-    private const val CELLULAR_MIN_BUFFER_MS = 45_000
-    private const val CELLULAR_MAX_BUFFER_MS = 45_000
+    private const val CELLULAR_MIN_BUFFER_MS = 60_000
+    private const val CELLULAR_MAX_BUFFER_MS = 120_000
     private const val CELLULAR_BUFFER_FOR_PLAYBACK_MS = 6_000
     private const val CELLULAR_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 6_000
 
@@ -257,8 +261,8 @@ object PlayerInstancePool {
                 if (isFastNetwork) WIFI_BUFFER_FOR_PLAYBACK_MS else CELLULAR_BUFFER_FOR_PLAYBACK_MS,
                 if (isFastNetwork) WIFI_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS else CELLULAR_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
             )
-            .setTargetBufferBytes(TARGET_BUFFER_BYTES)
-            .setPrioritizeTimeOverSizeThresholds(true)
+            .setTargetBufferBytes(targetBufferBytes())
+            .setPrioritizeTimeOverSizeThresholds(false)
             .build()
         return ExoPlayer.Builder(context)
             .setRenderersFactory(createRenderersFactory(context))

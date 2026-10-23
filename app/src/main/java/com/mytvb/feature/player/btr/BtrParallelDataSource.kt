@@ -57,7 +57,11 @@ private class BtrParallelDataSource(
             try {
                 downloader.download(dataSpec, upstream, routes, listeners.toList(), context ?: BtrDownloader.Request()) { channel.send(it) }
                 channel.close()
-            } catch (e: Throwable) { channel.close(e) }
+            } catch (e: Throwable) {
+                // [btr-hardening] 非網路錯誤（程式例外）也顯示在 Debug，避免只看到上一個 DNS/網路錯誤。
+                if (e !is IOException && e !is CancellationException) BtrRuntimeDiagnostics.counters.error("内部错误 ${e.javaClass.simpleName}")
+                channel.close(e)
+            }
         }
         return dataSpec.length
     }

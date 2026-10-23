@@ -26,4 +26,17 @@ class BtrSchedulerPolicyTest {
         state.failure(fast, 0L)
         assertTrue(state.rangeCandidates().none { it.host == "fast.bilivideo.com" })
     }
+
+    @Test
+    fun sortingSampledAndUnmeasuredRoutesDoesNotThrow() {
+        // A cancelled hedge leaves a sampled metric without lastSuccessAt; unmeasured routes have none.
+        val sampled = Uri.parse("https://sampled.bilivideo.com/video.m4s?x=1")
+        val unmeasured = (1..6).map { Uri.parse("https://n$it.bilivideo.com/video.m4s?x=1") }
+        val state = VideoPlayerCdnFailoverState(unmeasured + sampled)
+
+        state.sample(sampled, 500_000L)
+
+        assertEquals(sampled, state.rescueCandidates().first())
+        assertEquals(sampled, state.rangeCandidates().first())
+    }
 }

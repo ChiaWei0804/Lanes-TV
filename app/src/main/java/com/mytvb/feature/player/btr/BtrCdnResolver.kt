@@ -21,7 +21,7 @@ internal object BtrCdnResolver {
         "upos-sz-mirrorali.bilivideo.com",
         "upos-sz-mirrorhw.bilivideo.com",
         "upos-sz-mirrorbos.bilivideo.com",
-        "upos-sz-mirror08c.bilivideo.com",
+        // [btr-hardening] 移除 upos-sz-mirror08c：域名已不存在（各家 DNS 皆 NXDOMAIN），只會產生「DNS 解析失败」。
         "upos-sz-mirrorbd.bilivideo.com",
         "upos-sz-mirror14b.bilivideo.com",
         "upos-sz-estgoss.bilivideo.com",

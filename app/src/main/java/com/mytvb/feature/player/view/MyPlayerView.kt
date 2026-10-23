@@ -3085,7 +3085,7 @@ class MyPlayerView @JvmOverloads constructor(
             val required = if (snapshot.requiredBps > 0) String.format(java.util.Locale.US, "%.2f MiB/s", snapshot.requiredBps / (1024.0 * 1024)) else "等待码率"
             append(String.format(java.util.Locale.US, "成功片段 %.2f MiB/s · 播放约需 %s\n", deliveredRate, required))
             append(String.format(java.util.Locale.US, "有效片段累计 %.1f MiB（网络接收包含补救流量）\n", snapshot.deliveredBytes / (1024.0 * 1024)))
-            append("累计完成 ${snapshot.completedRanges} 段 · 重试 ${snapshot.retries} · 缓冲 ${aheadMs / 1000}s / 目标 45s\n")
+            append("累计完成 ${snapshot.completedRanges} 段 · 重试 ${snapshot.retries} · 缓冲 ${aheadMs / 1000}s / 目标 ${com.mytvb.feature.player.PlayerInstancePool.WIFI_MAX_BUFFER_MS / 1000}s（低于 ${com.mytvb.feature.player.PlayerInstancePool.WIFI_MIN_BUFFER_MS / 1000}s 补充）\n")
             if (snapshot.lastError.isNotBlank()) append("最近错误: ${snapshot.lastError}\n")
             append("连接为 0 表示当前无网络传输；缓存/缓冲不代表加速失败")
         }

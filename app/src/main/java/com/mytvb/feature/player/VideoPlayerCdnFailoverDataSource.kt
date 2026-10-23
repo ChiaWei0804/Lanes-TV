@@ -46,9 +46,11 @@ internal class VideoPlayerCdnFailoverState(
         candidates.filter(::allows).ifEmpty { candidates }
     }
     private fun available(): List<Uri> = urls().filter { (blockedUntil[it.toString()] ?: 0L) <= System.currentTimeMillis() }
+    // [btr-hardening] 必須是 0L：selector 回傳 Comparable<*>，寫 0 會變成 Int，
+    // 與已測速節點的 Long 比較時拋 ClassCastException，整個片段下載失敗（Source error）。
     private fun sorted(list: List<Uri>): List<Uri> = list.sortedWith(compareByDescending<Uri> {
-        (routeMetrics[routeKey(it)]?.lastSuccessAt ?: 0) > 0
-    }.thenByDescending { routeMetrics[routeKey(it)]?.bytesPerSecond ?: 0 })
+        (routeMetrics[routeKey(it)]?.lastSuccessAt ?: 0L) > 0L
+    }.thenByDescending { routeMetrics[routeKey(it)]?.bytesPerSecond ?: 0L })
     override fun startupCandidates(): List<Uri> = synchronized(this) {
         val originals = if (mode() == com.mytvb.feature.player.btr.BtrCdnMode.CUSTOM) emptyList() else originalCandidates
         val pool = (originals + candidates).distinct().filter(::allows).ifEmpty { candidates }
