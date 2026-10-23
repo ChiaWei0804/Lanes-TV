@@ -81,7 +81,7 @@ class MarmotX5WebViewClient(
 
     override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
         Log.w(TAG, "onReceivedSslError: ${error?.primaryError}")
-        handler?.proceed()
+        handler?.cancel() // [btr-hardening] 不再忽略 SSL 錯誤
     }
 
     /** 完整的请求拦截（对标系统版 [MarmotSystemWebViewClient.shouldInterceptRequest]，X5 包名）。 */

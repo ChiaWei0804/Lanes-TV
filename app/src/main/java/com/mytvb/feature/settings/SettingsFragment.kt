@@ -179,7 +179,8 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
 
         private val HOME_START_PAGE_OPTIONS = arrayOf("推荐", "热门", "番剧", "影视", "动态")
         private val BTR_MODE_OPTIONS = arrayOf("大陆 CDN", "海外 CDN", "自定义")
-        private val BTR_THREAD_OPTIONS = arrayOf("4", "8", "16", "32", "64", "128")
+        // [btr-hardening] 手動執行緒上限 128 → 32，降低觸發 B 站風控的機率
+        private val BTR_THREAD_OPTIONS = arrayOf("4", "8", "16", "32")
         private val BTR_TAKEOVER_OPTIONS = arrayOf("全接管", "兼容模式")
 
         /** 界面语言选项：tag 空串=跟随系统；语言名固定显示各自语言原文（业界惯例，不随 UI 语言翻译）。 */
@@ -270,7 +271,6 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             SettingGroup(R.string.setting_group_browse, listOf(
                 stored(KEY_DEFAULT_START_PAGE, R.string.default_start_page, "热门"),
                 stored(KEY_LIVE_ENTRY, R.string.live_entry, "关"),
-                stored(KEY_CCTV_LIVE_ENTRY, R.string.cctv_live, "关"),
                 stored(KEY_SHOW_VIDEO_DETAIL, R.string.show_video_detail_page, "关"),
                 stored(KEY_DOUYIN_MODE, R.string.douyin_mode, "关"),
                 stored(KEY_GIVE_COIN_NUMBER, R.string.give_coin_number, "2")
@@ -389,12 +389,10 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         // 关于：应用 / 组件 / 诊断 / 设备信息
         aboutGroups = listOf(
             SettingGroup(R.string.setting_group_about_app, listOf(
-                plain(KEY_APP_VERSION, R.string.app_version, BuildConfig.VERSION_NAME),
-                plain(KEY_CHECK_UPDATE, R.string.check_update, getString(R.string.update_click_to_check))
+                // [btr-hardening] 移除「檢查更新」（原本指向上游 qianxuntudou-ops/MyBili，簽章不同無法覆蓋安裝）
+                plain(KEY_APP_VERSION, R.string.app_version, BuildConfig.VERSION_NAME)
             )),
-            SettingGroup(R.string.setting_group_components, listOf(
-                plain(KEY_X5_CORE, R.string.x5_core_replace, getString(R.string.x5_status_not_installed))
-            )),
+            // [btr-hardening] 移除「X5 內核」元件組（僅電視直播使用，該功能已停用）
             SettingGroup(R.string.setting_group_diagnostics, listOf(
                 plain(KEY_LOG_RECORD, R.string.log_record, getString(if (AppLog.isEnabled) R.string.on else R.string.off)),
                 plain(KEY_DEBUG_LOG, R.string.debug_log)
@@ -679,8 +677,8 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             }
             KEY_PSAS_INTERVAL -> showPsasIntervalChoiceDialog()
             // —— 关于 ——
-            KEY_CHECK_UPDATE -> checkForUpdate()
-            KEY_X5_CORE -> startXdDownload()
+            // [btr-hardening] 檢查更新與 X5 下載已停用（設定項已移除，這裡再擋一次）
+            KEY_CHECK_UPDATE, KEY_X5_CORE -> Unit
             KEY_LOG_RECORD -> {
                 val newValue = if (AppLog.isEnabled) "关" else "开"
                 AppLog.setEnabled(newValue == "开")

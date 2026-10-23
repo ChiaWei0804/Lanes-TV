@@ -20,7 +20,7 @@
 
     <application
         android:name=".MyBLBLApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:banner="@drawable/tv_banner"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
@@ -74,23 +74,8 @@
             android:configChanges="screenSize|orientation|keyboardHidden"
             android:theme="@style/Theme.MyBLBL"
             tools:ignore="DiscouragedApi" />
-
-        <activity
-            android:name=".ui.activity.CctvPlayerActivity"
-            android:exported="false"
-            android:screenOrientation="sensorLandscape"
-            android:configChanges="screenSize|orientation|keyboardHidden"
-            android:theme="@style/Theme.MyBLBL"
-            tools:ignore="DiscouragedApi" />
-
-        <!-- TV 直播（Marmot 引擎，WebView + tv-web 脚本） -->
-        <activity
-            android:name=".ui.activity.MarmotLiveActivity"
-            android:exported="false"
-            android:screenOrientation="landscape"
-            android:configChanges="screenSize|orientation|keyboardHidden|screenLayout|uiMode"
-            android:theme="@style/Theme.MyBLBL"
-            tools:ignore="DiscouragedApi" />
+        <!-- [btr-hardening] CctvPlayerActivity 已移除（電視直播/CCTV 停用） -->
+        <!-- [btr-hardening] MarmotLiveActivity 已移除（電視直播/CCTV 停用） -->
 
         <activity
             android:name=".ui.activity.GaiaVgateActivity"

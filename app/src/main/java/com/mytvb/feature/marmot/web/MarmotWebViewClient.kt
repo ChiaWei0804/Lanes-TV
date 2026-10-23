@@ -101,7 +101,7 @@ class MarmotSystemWebViewClient(
 
     override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
         Log.w(TAG, "onReceivedSslError: ${error?.primaryError}")
-        handler?.proceed() // 忽略 SSL 错误（参考行为，部分直播证书不规范）
+        handler?.cancel() // [btr-hardening] 不再忽略 SSL 錯誤
     }
 
     /**

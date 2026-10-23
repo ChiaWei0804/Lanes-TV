@@ -660,7 +660,7 @@ class MyPlayerSettingView @JvmOverloads constructor(
     private fun showBtrChoice(itemId: Int) {
         val (title, labels, selected) = when (itemId) {
             ITEM_BTR_MODE -> Triple(R.string.btr_cdn_mode, listOf("大陆 CDN", "海外 CDN", "自定义"), panelState.btrMode.ordinal)
-            ITEM_BTR_THREADS -> Triple(R.string.btr_thread_count, listOf("4", "8", "16", "32", "64", "128"), listOf(4, 8, 16, 32, 64, 128).indexOf(panelState.btrConcurrency))
+            ITEM_BTR_THREADS -> Triple(R.string.btr_thread_count, listOf("4", "8", "16", "32"), listOf(4, 8, 16, 32).indexOf(panelState.btrConcurrency))
             ITEM_BTR_TAKEOVER -> Triple(R.string.btr_takeover_mode, listOf("全接管", "兼容模式"), panelState.btrTakeover.ordinal)
             else -> return
         }

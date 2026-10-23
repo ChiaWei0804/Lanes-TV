@@ -367,8 +367,8 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
     }
 
     fun applyCctvLiveEntryVisibility() {
-        val cctvLiveEntry = appSettings.getCachedString("cctv_live_entry", "关") ?: "关"
-        val show = cctvLiveEntry == "开"
+        // [btr-hardening] 電視直播/CCTV 功能已停用（JS 橋與雲端腳本更新有安全風險），入口永遠隱藏。
+        val show = false
         binding.myTabView.setCctvLiveButtonVisible(show)
         if (!show && currentFragmentIndex == CCTV_TAB_INDEX) {
             binding.myTabView.selectTab(0)
@@ -430,9 +430,8 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         AppLog.d("FocusTrace", "onTabSelected index=$index focusedBefore=${currentFocus?.javaClass?.simpleName}#${currentFocus?.id}")
         // CCTV 直播 tab：直接进 Marmot 播放器，不加载频道列表 Fragment（对标参考 StartActivity→LiveActivity）
         if (index == CCTV_TAB_INDEX) {
-            MarmotLiveActivity.start(this)
-            // 焦点留在 TV 直播按钮（直播返回后焦点仍在该按钮）
-            binding.myTabView.focusCurrentTab()
+            // [btr-hardening] 電視直播已停用，不再啟動 MarmotLiveActivity。
+            binding.myTabView.selectTab(0)
             return
         }
         if (supportFragmentManager.backStackEntryCount > 0) {
@@ -447,7 +446,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), TabBarView.OnTabClickL
         AppLog.d("FocusTrace", "onTabReselected index=$index focusedBefore=${currentFocus?.javaClass?.simpleName}#${currentFocus?.id}")
         // CCTV 直播 tab 再次点击：重新进入直播（Tab 4 不持有 Fragment，reselect 也要能进直播）
         if (index == CCTV_TAB_INDEX) {
-            MarmotLiveActivity.start(this)
+            // [btr-hardening] 電視直播已停用。
             return
         }
         // 其他侧边栏按钮再次点击，不触发刷新，避免抢走焦点

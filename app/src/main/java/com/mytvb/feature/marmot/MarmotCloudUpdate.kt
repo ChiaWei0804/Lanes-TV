@@ -30,6 +30,7 @@ object MarmotCloudUpdate {
     private const val UPDATE_URL = "http://api.vonchange.com/utao/config/update.json"
     private const val TV_WEB_DIR = "tv-web"
     private const val UPDATE_JSON_NAME = "update.json"
+    private const val CLOUD_UPDATE_ENABLED = false
     private val gson = GsonHolder.DEFAULT
 
     /** 独立 client：不带 B 站 cookie/buvid，纯净请求 vonchange。 */
@@ -74,6 +75,8 @@ object MarmotCloudUpdate {
      * @return true 表示有更新并已下载。
      */
     fun checkAndUpdateRes(context: Context): Boolean {
+        // [btr-hardening] 停用：原本以明文 HTTP 從第三方伺服器下載未簽章腳本，可被中間人竄改。
+        if (!CLOUD_UPDATE_ENABLED) return false
         val config = getConfig() ?: return false
         val resNew = config.res ?: run {
             AppLog.w(TAG, "checkAndUpdateRes: config.res 为空，无更新信息")
@@ -144,6 +147,10 @@ object MarmotCloudUpdate {
                         }
                         if (name.isBlank()) { zis.closeEntry(); entry = zis.nextEntry; continue }
                         val outFile = File(targetDir, name)
+                        // [btr-hardening] Zip Slip 防護：解壓路徑必須留在 targetDir 內
+                        if (!outFile.canonicalPath.startsWith(targetDir.canonicalPath + File.separator)) {
+                            throw SecurityException("zip entry escapes target dir: ${entry.name}")
+                        }
                         if (entry.isDirectory) {
                             outFile.mkdirs()
                         } else {

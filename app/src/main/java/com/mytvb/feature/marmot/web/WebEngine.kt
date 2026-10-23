@@ -138,7 +138,7 @@ class WebEngine(
         wv.isHorizontalScrollBarEnabled = false
         android.webkit.CookieManager.getInstance().setAcceptCookie(true)
         android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
-        android.webkit.WebView.setWebContentsDebuggingEnabled(true)
+        android.webkit.WebView.setWebContentsDebuggingEnabled(com.mytvb.BuildConfig.DEBUG)
         wv.addJavascriptInterface(jsBridge, jsBridge.bridgeName)
         wv.webViewClient = MarmotSystemWebViewClient(context, onProgress, onPageLoaded)
         wv.webChromeClient = SystemChromeClient(onProgress, onPageLoaded)
@@ -154,7 +154,7 @@ class WebEngine(
         wv.isVerticalScrollBarEnabled = false
         wv.isHorizontalScrollBarEnabled = false
         com.tencent.smtt.sdk.CookieManager.getInstance().setAcceptCookie(true)
-        com.tencent.smtt.sdk.WebView.setWebContentsDebuggingEnabled(true)
+        com.tencent.smtt.sdk.WebView.setWebContentsDebuggingEnabled(com.mytvb.BuildConfig.DEBUG)
         wv.addJavascriptInterface(jsBridge, jsBridge.bridgeName)
         wv.webViewClient = MarmotX5WebViewClient(context, onProgress, onPageLoaded)
         wv.webChromeClient = X5ChromeClient(onProgress, onPageLoaded)

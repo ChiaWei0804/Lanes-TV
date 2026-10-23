@@ -47,6 +47,8 @@ object BtrSettingsStore {
     const val KEY_ERROR_NOTICES = "btr_error_notices"
     const val KEY_DEBUG_NOTICES = "btr_debug_notices"
     const val KEY_FLOATING_BUTTON = "btr_floating_button"
+    /** [btr-hardening] 手動執行緒上限（原 128）。自動模式的階梯本來就封頂 32。 */
+    const val MAX_CONCURRENCY = 32
 
     private val appSettings: AppSettingsDataStore get() = KoinPlatform.getKoin().get()
 
@@ -56,7 +58,7 @@ object BtrSettingsStore {
             enabled = parseToggle(value(KEY_ENABLED), true),
             mode = BtrCdnMode.from(value(KEY_MODE)),
             customHosts = sanitizeHosts(value(KEY_CUSTOM_HOSTS).orEmpty().split('|')),
-            concurrency = value(KEY_CONCURRENCY)?.toIntOrNull()?.coerceIn(4, 128) ?: 8,
+            concurrency = value(KEY_CONCURRENCY)?.toIntOrNull()?.coerceIn(4, MAX_CONCURRENCY) ?: 8,
             autoConcurrency = parseToggle(value(KEY_AUTO_CONCURRENCY), true),
             takeover = BtrTakeoverMode.from(value(KEY_TAKEOVER)),
             liveEnabled = parseToggle(value(KEY_LIVE_ENABLED), false),
@@ -69,7 +71,7 @@ object BtrSettingsStore {
     fun saveEnabled(enabled: Boolean) = save(KEY_ENABLED, enabled.toStoredToggle())
     fun saveMode(mode: BtrCdnMode) = save(KEY_MODE, mode.value)
     fun saveCustomHosts(hosts: List<String>) = save(KEY_CUSTOM_HOSTS, sanitizeHosts(hosts).joinToString("|"))
-    fun saveConcurrency(value: Int) = save(KEY_CONCURRENCY, value.coerceIn(4, 128).toString())
+    fun saveConcurrency(value: Int) = save(KEY_CONCURRENCY, value.coerceIn(4, MAX_CONCURRENCY).toString())
     fun saveAutoConcurrency(enabled: Boolean) = save(KEY_AUTO_CONCURRENCY, enabled.toStoredToggle())
     fun saveTakeover(mode: BtrTakeoverMode) = save(KEY_TAKEOVER, mode.value)
     fun saveLiveEnabled(enabled: Boolean) = save(KEY_LIVE_ENABLED, enabled.toStoredToggle())

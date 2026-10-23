@@ -62,11 +62,11 @@ android {
 
     defaultConfig {
         // 默认包名；可通过 -PapplicationId=xxx 覆盖，用于 fork 版与原版共存安装
-        applicationId = (project.findProperty("applicationId") as? String) ?: "com.mytvb"
+        applicationId = (project.findProperty("applicationId") as? String) ?: "com.mytvb.btr"
         minSdk = 23
         targetSdk = 35
         versionCode = 97
-        versionName = "2.0.9-btr.11"
+        versionName = "2.0.9-btr.11-hardened.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

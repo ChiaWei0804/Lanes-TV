@@ -147,6 +147,7 @@ object MarmotLiveData {
     /** 读 filesDir/<path>，文件不存在/为空/读异常返回 null。 */
     private fun readFileDir(context: Context, path: String): String? {
         val f = File(context.filesDir, path)
+        if (!isInsideTvWeb(context, f)) return null
         if (!f.exists() || f.length() == 0L) return null
         return runCatching { f.readText() }.getOrNull()
     }
@@ -200,7 +201,14 @@ object MarmotLiveData {
      * 读取 tv-web 资源：优先 filesDir/tv-web（云端更新后的），无则 assets/tv-web（内置种子）。
      * 对应参考 `FileUtil.readExt` 的优先级（filesDir → assets 兜底）。
      */
+    /** [btr-hardening] 只允許讀 filesDir/tv-web 底下的檔案，阻擋 ../ 讀取登入 cookie 等私有檔。 */
+    private fun isInsideTvWeb(context: Context, f: File): Boolean {
+        val base = File(context.filesDir, "tv-web").canonicalPath + File.separator
+        return runCatching { f.canonicalPath.startsWith(base) }.getOrDefault(false)
+    }
+
     fun readFileWithFallback(context: Context, path: String): String {
+        if (path.contains("..")) return ""
         // 1. filesDir/<path>（云端更新写入的位置）
         readFileDir(context, path)?.let { return it }
         // 2. assets/<path>（内置种子）
@@ -209,7 +217,9 @@ object MarmotLiveData {
 
     /** 读取 tv-web 资源为 InputStream（用于 shouldInterceptRequest 返回二进制资源）。 */
     fun readStreamWithFallback(context: Context, path: String): java.io.InputStream? {
+        if (path.contains("..")) return null
         val localFile = File(context.filesDir, path)
+        if (!isInsideTvWeb(context, localFile)) return null
         if (localFile.exists() && localFile.length() > 0) {
             runCatching { return java.io.FileInputStream(localFile) }
         }
