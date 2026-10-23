@@ -7,17 +7,32 @@ $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 Set-Location $Root
 
-# ---- 1. 找 JDK（優先用 Android Studio 內建的 JBR）----
-if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME\bin\java.exe")) {
-    $candidates = @(
-        "$env:ProgramFiles\Android\Android Studio\jbr",
-        "$env:LOCALAPPDATA\Programs\Android Studio\jbr"
-    )
-    $jbr = $candidates | Where-Object { Test-Path "$_\bin\java.exe" } | Select-Object -First 1
-    if (-not $jbr) { throw "找不到 JDK。請先安裝 Android Studio，或設定 JAVA_HOME 指向 JDK 17 以上。" }
-    $env:JAVA_HOME = $jbr
+# ---- 1. 找 JDK（Gradle 8.14.3 只支援 JDK 17~24）----
+function Get-JavaMajor($home_) {
+    $exe = Join-Path $home_ "bin\java.exe"
+    if (-not (Test-Path $exe)) { return 0 }
+    $line = (& cmd /c "`"$exe`" -version 2>&1" | Select-Object -First 1) -as [string]
+    if ($line -match 'version "(\d+)(\.(\d+))?') {
+        $m = [int]$Matches[1]; if ($m -eq 1) { $m = [int]$Matches[3] }; return $m
+    }
+    return 0
 }
-Write-Host "JAVA_HOME = $env:JAVA_HOME"
+$candidates = @()
+if ($env:JAVA_HOME) { $candidates += $env:JAVA_HOME }
+$candidates += Get-ChildItem "$env:ProgramFiles\Eclipse Adoptium" -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match '^jdk-(17|21)' } | Sort-Object Name -Descending | ForEach-Object { $_.FullName }
+$candidates += @("$env:ProgramFiles\Android\Android Studio\jbr", "$env:LOCALAPPDATA\Programs\Android Studio\jbr")
+$found = $null
+foreach ($c in $candidates) {
+    $v = Get-JavaMajor $c
+    if ($v -gt 0) { Write-Host "找到 JDK $v：$c" }
+    if ($v -ge 17 -and $v -le 24) { $found = $c; break }
+}
+if (-not $found) {
+    throw "找不到 JDK 17~24（Android Studio 內建的版本可能太新）。請執行：winget install EclipseAdoptium.Temurin.21.JDK  然後重新開 PowerShell 再跑一次。"
+}
+$env:JAVA_HOME = $found
+Write-Host "使用 JAVA_HOME = $env:JAVA_HOME"
 $keytool = "$env:JAVA_HOME\bin\keytool.exe"
 
 # ---- 2. 找 Android SDK ----
