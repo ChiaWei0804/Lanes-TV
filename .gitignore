@@ -112,3 +112,7 @@ AGENTS.md
 app/debug/output-metadata.json
 .codebuddy/
 /.zcode
+
+keystore/
+output/
+local.properties
