@@ -1,6 +1,7 @@
 package com.mytvb.core.ui.base
 
 import android.content.Context
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
@@ -59,6 +60,16 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
         if (initialFullscreenModeDeferred) {
             applyFullscreenModeAfterFirstDraw()
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // [btr-hardening] 播放時電視切換解析度/更新率（匹配幀率、HDR）後，系統會把
+        // displayMetrics 重設成原生 density，畫面放大。Activity 宣告了 screenSize 等
+        // configChanges 不會重建，所以必須在這裡重新釘一次縮放倍率。
+        UiScale.apply(resources)
+        application.resources?.let { UiScale.apply(it) }
+        window?.decorView?.requestLayout()
     }
 
     override fun onResume() {

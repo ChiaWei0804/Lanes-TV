@@ -248,6 +248,12 @@ class MyBLBLApplication : Application() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // [btr-hardening] 顯示模式切換後 application resources 的 density 也會被重設
+        com.mytvb.core.ui.base.UiScale.apply(resources)
+    }
+
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         when {
