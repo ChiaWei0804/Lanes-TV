@@ -1,7 +1,7 @@
 # btr-hardening 修改說明
 
 基底：nitansde/MyTVB-Speed-Boost `18f99cb`（v2.0.9-btr.11）
-本版：`2.0.9-btr.11-hardened.1`，套件名稱 `com.mytvb.btr`（可與上游 MyTVB 並存）
+第一版：`2.0.9-btr.11-hardened.1`（之後的版本見文末「後續修改」），套件名稱 `com.mytvb.btr`（可與上游 MyTVB 並存）
 
 完整 diff：`0001-btr-hardening-CCTV-JS-BTR.patch`，或在本資料夾執行 `git show HEAD`。
 程式碼中所有修改處都標了 `[btr-hardening]`，可直接搜尋。
@@ -30,3 +30,13 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 
 輸出：`output\MyTVB-BTR-hardened.apk`
 金鑰：`keystore\mytvb-release.p12`（請備份，連同密碼）
+
+## 後續修改
+
+| 版本 | 內容 |
+|---|---|
+| hardened.2 | BTR 新增「自動」CDN 模式並設為預設（海外 + 大陸節點一起測速）；動態頁 UP 頭像載入保底；開啟「日誌記錄」時 release 版也輸出到 logcat |
+| hardened.3 | 修正退出影片後設定頁放大：頁面建立前檢查並修正 density，記錄偏移來源 |
+| hardened.4 | density 檢查擴大到每個 View 建立前（列表卡片也涵蓋） |
+
+給 Claude Code 的專案說明（編譯、adb、抓 log 的方式）在 `CLAUDE.md`。
