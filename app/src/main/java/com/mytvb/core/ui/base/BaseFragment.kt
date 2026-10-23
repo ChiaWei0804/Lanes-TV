@@ -62,6 +62,10 @@ abstract class BaseFragment<VB : ViewBinding> : Fragment() {
         savedInstanceState: Bundle?
     ): View? {
         if (rootView == null) {
+            // [btr-hardening] inflate 前重新釘一次縮放：播放影片後 density 可能被系統重設，
+            // 之後新建的頁面（例如設定頁）會整頁放大。
+            UiScale.ensure(inflater.context.resources, "${this::class.java.simpleName}.onCreateView")
+            activity?.application?.resources?.let { UiScale.ensure(it, "application") }
             val className = this::class.java.simpleName
             val t0 = SystemClock.elapsedRealtime()
             val view = if (useLightBaseContainer() && !isTopBarVisible()) {

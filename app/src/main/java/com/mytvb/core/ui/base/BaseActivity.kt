@@ -64,6 +64,7 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        com.mytvb.core.common.log.AppLog.w("UiScale", "onConfigurationChanged ${this::class.java.simpleName} densityDpi=${newConfig.densityDpi} screen=${newConfig.screenWidthDp}x${newConfig.screenHeightDp}dp")
         // [btr-hardening] 播放時電視切換解析度/更新率（匹配幀率、HDR）後，系統會把
         // displayMetrics 重設成原生 density，畫面放大。Activity 宣告了 screenSize 等
         // configChanges 不會重建，所以必須在這裡重新釘一次縮放倍率。

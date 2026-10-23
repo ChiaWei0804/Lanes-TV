@@ -96,6 +96,17 @@ object UiScale {
      * 先钉一次）+ BaseActivity.onCreate 的 refresh 之后（设置变更后的新值）。
      * 幂等，重复调用安全。
      */
+    /**
+     * [btr-hardening] 若 density 已偏離目標值（被系統重設），記錄來源並重新套用；未偏離則什麼都不做。
+     */
+    fun ensure(resources: Resources, source: String) {
+        val metrics = resources.displayMetrics
+        val target = designScale(metrics.widthPixels, metrics.heightPixels) * scale()
+        if (kotlin.math.abs(metrics.density - target) < 0.01f) return
+        AppLog.w(TAG, "density drift at $source: current=${metrics.density} dpi=${metrics.densityDpi} target=$target screen=${metrics.widthPixels}x${metrics.heightPixels}")
+        apply(resources)
+    }
+
     @Suppress("DEPRECATION")
     fun apply(resources: Resources) {
         val metrics = resources.displayMetrics
