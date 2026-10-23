@@ -121,30 +121,30 @@ object AppLog {
     fun d(tag: String, message: String) {
         if (!isEnabled) return
         logToBuffer(LogEntry.LEVEL_DEBUG, tag, message)
-        if (BuildConfig.DEBUG) runCatching { Log.d(tag, message) }
+        if (BuildConfig.DEBUG || isEnabled) runCatching { Log.println(Log.DEBUG, tag, message) } // [btr-hardening] println 不會被 R8 的 assumenosideeffects 移除，開啟「日誌記錄」後 release 版也能用 adb logcat 抓
     }
 
     fun i(tag: String, message: String) {
         if (!isEnabled) return
         logToBuffer(LogEntry.LEVEL_INFO, tag, message)
-        if (BuildConfig.DEBUG) runCatching { Log.i(tag, message) }
+        if (BuildConfig.DEBUG || isEnabled) runCatching { Log.println(Log.INFO, tag, message) } // [btr-hardening] println 不會被 R8 的 assumenosideeffects 移除，開啟「日誌記錄」後 release 版也能用 adb logcat 抓
     }
 
     fun e(tag: String, message: String, throwable: Throwable? = null) {
         if (!isEnabled) return
         logToBuffer(LogEntry.LEVEL_ERROR, tag, message)
-        if (BuildConfig.DEBUG) runCatching { Log.e(tag, message, throwable) }
+        if (BuildConfig.DEBUG || isEnabled) runCatching { Log.e(tag, message, throwable) }
     }
 
     fun w(tag: String, message: String, throwable: Throwable? = null) {
         if (!isEnabled) return
         logToBuffer(LogEntry.LEVEL_WARN, tag, message)
-        if (BuildConfig.DEBUG) runCatching { Log.w(tag, message, throwable) }
+        if (BuildConfig.DEBUG || isEnabled) runCatching { Log.w(tag, message, throwable) }
     }
 
     fun v(tag: String, message: String) {
         if (!isEnabled) return
         logToBuffer(LogEntry.LEVEL_VERBOSE, tag, message)
-        if (BuildConfig.DEBUG) runCatching { Log.v(tag, message) }
+        if (BuildConfig.DEBUG || isEnabled) runCatching { Log.println(Log.VERBOSE, tag, message) } // [btr-hardening] println 不會被 R8 的 assumenosideeffects 移除，開啟「日誌記錄」後 release 版也能用 adb logcat 抓
     }
 }
