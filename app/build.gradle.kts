@@ -65,9 +65,9 @@ android {
         applicationId = (project.findProperty("applicationId") as? String) ?: "com.mytvb.btr"
         minSdk = 23
         targetSdk = 35
-        // [btr-hardening] Lanes-TV 改用 X.Y.Z；versionCode 延續原本的序號（hardened.7 = 103）。
+        // [btr-hardening] Lanes-TV 改用 X.Y.Z；versionCode 延續原本的序號（hardened.7 = 103；1.0.0 = 106）。
         // 應用內更新以 versionCode 判斷新舊，tag 和 versionName 必須是 vX.Y.Z / X.Y.Z（見 RELEASING.md）
-        versionCode = 104
+        versionCode = 106
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

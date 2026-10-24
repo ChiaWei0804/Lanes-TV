@@ -41,7 +41,7 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 | hardened.5 | 修正 BTR 節點排序的 Long/Int 型別錯誤（ClassCastException → 片段下載失敗、緩衝歸零、Source error、自動降畫質）；移除已不存在的 `upos-sz-mirror08c` 節點；程式例外也顯示在 Debug；點播緩衝目標改為 120 秒、低於 60 秒才恢復下載，位元組上限為 heap 的 45%（防 4K OOM） |
 | hardened.6 | BTR Debug 的緩衝目標改為顯示實際設定（120 秒，低於 60 秒補充），不再寫死 45 秒 |
 | hardened.7 | 影片卡片（首頁、動態、搜尋、歷史、收藏）是程式碼建立的，不經過 inflate 的 density 檢查；改在計算卡片尺寸前也檢查，修正部分卡片標題字體變兩倍大、卡片被拉長 |
-| 1.0.0（104） | 改名 Lanes-TV（圖示沿用原圖）；版本改用 X.Y.Z；應用內更新（下方說明）；release 沒有正式金鑰時不再退回 debug 金鑰，直接編譯失敗；修正 instrumented 測試相依（espresso 3.1.5 不存在） |
+| 1.0.0（106） | 改名 Lanes-TV（圖示沿用原圖）；版本改用 X.Y.Z；應用內更新（下方說明）；release 沒有正式金鑰時不再退回 debug 金鑰，直接編譯失敗；修正 instrumented 測試相依（espresso 3.1.5 不存在）；修正 Android 9 對話框底部按鈕被裁切 |
 
 給 Claude Code 的專案說明（編譯、adb、抓 log 的方式）在 `CLAUDE.md`。
 

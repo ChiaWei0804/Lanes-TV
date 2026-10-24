@@ -41,7 +41,7 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
   - 如果使用者已在環境變數設好 `RELEASE_STORE_FILE / RELEASE_STORE_PASSWORD / RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD`，也可以直接 `.\gradlew.bat :app:assembleRelease --no-daemon`
 - **單元測試**：`.\gradlew.bat :app:testDebugUnitTest --no-daemon`（每次改 BTR 或播放器後先跑）
 - 第一次編譯約 6 分鐘，之後約 1–2 分鐘
-- 每次要裝到電視的版本都要遞增 `app/build.gradle.kts` 的 `versionCode`，`versionName` 用 `X.Y.Z`（1.0.0 = versionCode 104 起）。發佈到 GitHub 讓裝置在 App 內更新：見 `RELEASING.md`（`tools\publish-release.ps1`，要等使用者要求才發佈）
+- 每次要裝到電視的版本都要遞增 `app/build.gradle.kts` 的 `versionCode`，`versionName` 用 `X.Y.Z`（1.0.0 = versionCode 106 起）。發佈到 GitHub 讓裝置在 App 內更新：見 `RELEASING.md`（`tools\publish-release.ps1`，要等使用者要求才發佈）
 - **在電視上跑 instrumented 測試一定要加 `-PapplicationId=com.mytvb.btr.updaterprobe`**（`connectedDebugAndroidTest`），否則會把 debug 版裝到 `com.mytvb.btr` 上。更新器的實機測試：先跑 `tools\updater-fixtures\make-fixtures.ps1` 產生測試檔，再加 `-Pandroid.testInstrumentationRunnerArguments.class=com.mytvb.core.common.update.ApkArchiveProbeTest`
 
 ### 簽章金鑰（絕對不能弄錯）

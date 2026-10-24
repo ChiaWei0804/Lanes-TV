@@ -37,7 +37,7 @@
 
 ## 新裝置第一次安裝
 
-App 內更新只能從 1.0.0（versionCode 104）以後的版本開始用。新裝置先用 adb 裝一次：
+App 內更新只能從 1.0.0（versionCode 106）以後的版本開始用。新裝置先用 adb 裝一次：
 
 ```powershell
 & $adb -s <裝置> install -r output\Lanes-TV.apk

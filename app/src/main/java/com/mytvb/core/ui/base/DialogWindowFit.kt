@@ -1,6 +1,8 @@
 package com.mytvb.core.ui.base
 
 import android.content.Context
+import android.view.View
+import android.view.ViewTreeObserver
 import android.view.Window
 import android.view.WindowManager
 
@@ -23,11 +25,36 @@ object DialogWindowFit {
         val w = window ?: return
         val dm = context.resources.displayMetrics
         val width = minOf(designWidthPx, (dm.widthPixels * 0.92f).toInt())
+        val maxHeight = (dm.heightPixels * 0.92f).toInt()
         val height = if (designHeightPx <= 0) {
             WindowManager.LayoutParams.WRAP_CONTENT
         } else {
-            minOf(designHeightPx, (dm.heightPixels * 0.92f).toInt())
+            minOf(designHeightPx, maxHeight)
         }
         w.setLayout(width, height)
+        if (designHeightPx <= 0) followContentHeight(w, context, width, maxHeight)
+    }
+
+    /**
+     * [btr-hardening] Android 9 的 ViewRootImpl 把 wrap_content 視窗的高度上限算成
+     * dipToPx(screenHeightDp)，用的是被 UiScale 改過的 density（2.0 → 1.0），
+     * 1080p 上限只剩 540px，內容較長的對話框底部按鈕被壓扁。上限比螢幕小時，
+     * 每次排版後自己量內容高度，直接給視窗固定高度（內容變動時跟著更新）。
+     */
+    private fun followContentHeight(window: Window, context: Context, width: Int, maxHeight: Int) {
+        val res = context.resources
+        val systemCap = (res.configuration.screenHeightDp * res.displayMetrics.density).toInt()
+        if (systemCap >= maxHeight) return
+        val decor = window.decorView
+        decor.viewTreeObserver.addOnGlobalLayoutListener(ViewTreeObserver.OnGlobalLayoutListener {
+            decor.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(maxHeight, View.MeasureSpec.AT_MOST)
+            )
+            val wanted = decor.measuredHeight
+            if (wanted > 0 && wanted != window.attributes.height) {
+                window.setLayout(width, wanted)
+            }
+        })
     }
 }
