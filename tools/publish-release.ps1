@@ -123,7 +123,22 @@ if ($LASTEXITCODE -ne 0) { throw "無法查詢 origin 的 tag（git ls-remote �
 if ($remoteTag) { throw "origin 已經有 tag $tag，請先遞增版本（或確認後手動刪除那個 tag）。" }
 
 # 從 git 的認證管理員取得權杖（只在記憶體）
-$credOut = "protocol=https`nhost=github.com`n`n" | git credential fill 2>$null
+# 用檔案當 stdin（內容只有 protocol / host）：主控台是 UTF-8 時，PowerShell 5.1 的管線和
+# Process.StandardInput 都會先送出 BOM，git 就讀不到 protocol
+$credIn = [IO.Path]::GetTempFileName()
+try {
+    [IO.File]::WriteAllText($credIn, "protocol=https`nhost=github.com`n`n", (New-Object Text.UTF8Encoding $false))
+    $psi = New-Object Diagnostics.ProcessStartInfo "cmd.exe", "/d /c git credential fill < `"$credIn`""
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $proc = [Diagnostics.Process]::Start($psi)
+    $credOut = $proc.StandardOutput.ReadToEnd() -split "`r?`n"
+    $null = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+} finally {
+    Remove-Item $credIn -ErrorAction SilentlyContinue
+}
 $token = ($credOut | Where-Object { $_ -like "password=*" } | Select-Object -First 1) -replace '^password=', ''
 if (-not $token) { throw "git 認證管理員裡沒有 github.com 的登入，請先在這台電腦 git push 一次。" }
 
