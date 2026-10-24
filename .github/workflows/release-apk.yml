@@ -11,6 +11,9 @@ permissions:
 
 jobs:
   build:
+    # [btr-hardening] 只在上游執行。Lanes-TV 用 tools/publish-release.ps1 在本機簽章並發佈（金鑰不上傳 GitHub），
+    # 這個 workflow 若在 fork 跑，會在同一個 tag 上傳另一個安裝檔並改掉 release 說明
+    if: github.repository == 'nitansde/MyTVB-Speed-Boost'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

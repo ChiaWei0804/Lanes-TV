@@ -17,7 +17,7 @@
     <string name="app_exit">再按一次返回退出应用</string>
     <string name="usage_tip_title">使用提示</string>
     <string name="usage_tip_content">1. 本应用仅供学习研究使用，请勿用于商业用途，避免侵犯哔哩哔哩相关权益。&lt;br&gt;&lt;br&gt;2. 应用支持直播入口和青少年模式，均可在设置中开启或关闭。&lt;br&gt;&lt;br&gt;3. 青少年模式关闭方法：&lt;b&gt;&lt;font color=\"#e74c3c\"&gt;遥控器依次按「上上下下左右左右」；触摸屏连续快速点击验证码区域 7 次即可通过验证。&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;4. 长按视频卡片可进行「稍后再看」等更多操作。</string>
-    <string name="app_name">MyTVB</string>
+    <string name="app_name">Lanes-TV</string>
     <string name="appbar_scrolling_view_behavior">com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior</string>
     <string name="audioTrack">音轨</string>
     <string name="auto">汽车</string>
@@ -513,6 +513,15 @@
     <string name="update_latest_format">已是最新版（%1$s）</string>
     <string name="update_new_version_format">新版本 %1$s</string>
     <string name="update_check_failed">检查失败</string>
+    <!-- [btr-hardening] 应用内更新 -->
+    <string name="update_err_rate_limited">GitHub 暂时限制查询，请稍后再试</string>
+    <string name="update_err_no_release">找不到可用的正式版</string>
+    <string name="update_err_incomplete">发布列表太长，无法完整检查</string>
+    <string name="update_err_bad_release">发布内容格式不正确</string>
+    <string name="update_err_storage">无法写入安装包，请检查存储空间</string>
+    <string name="update_err_rejected_format">安装包验证失败（%1$s），已停止更新</string>
+    <string name="update_need_install_permission">请允许本应用安装未知应用，返回后会继续更新</string>
+    <string name="update_install_permission_denied">未获得安装权限，已取消更新</string>
     <string name="log_enabled_toast">日志记录：%1$s</string>
 
     <!-- ===== 多语言：风控验证 ===== -->

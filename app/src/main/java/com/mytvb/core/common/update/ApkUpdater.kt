@@ -1,327 +1,147 @@
-@file:Suppress("SpellCheckingInspection")
-
 package com.mytvb.core.common.update
 
-import com.mytvb.core.common.format.NumberUtils
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
-import com.mytvb.BuildConfig
 import com.mytvb.core.common.log.AppLog
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import okhttp3.Dns
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
 import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
-import java.net.Inet4Address
-import java.net.InetAddress
-import java.net.UnknownHostException
-import java.util.Locale
-import java.util.concurrent.TimeUnit
-import kotlin.math.roundToInt
-import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * [btr-hardening] 應用內更新（Android 端）：查詢、下載、驗證簽章、交給系統安裝程式。
+ *
+ * 只信任這個 fork 自己的 GitHub Releases（[UpdateConfig]），而且安裝檔必須和目前安裝的 App
+ * 用同一把正式金鑰簽章（[UpdatePolicy.expectedSigners]）。網路部分在 [UpdateClient]。
+ *
+ * 檔案位置（都在 filesDir，不會被「清除快取」或系統回收）：
+ * - `update/staging/`：下載中、尚未驗證
+ * - `update/ready/`：驗證通過、等待安裝（FileProvider 只分享這個資料夾）
+ */
 object ApkUpdater {
 
-    private const val GITHUB_OWNER = "qianxuntudou-ops"
-    private const val GITHUB_REPO = "MyBili"
-    private const val RELEASE_API_URL =
-        "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
-
-    private const val COOLDOWN_MS = 5_000L
     private const val TAG = "ApkUpdater"
-    private const val UPDATE_DIR_NAME = "update"
+    private const val COOLDOWN_MS = 5_000L
+    private const val UPDATE_DIR = "update"
+    private const val READY_KEEP_MS = 24L * 60 * 60 * 1000
 
     @Volatile
     private var lastStartedAtMs: Long = 0L
 
-    private val okHttpLazy: Lazy<OkHttpClient> = lazy {
-        OkHttpClient.Builder()
-            .dns(IPv4OnlyDns)
-            .connectTimeout(12, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .build()
-    }
-
-    private object IPv4OnlyDns : Dns {
-        override fun lookup(hostname: String): List<InetAddress> {
-            val addresses = Dns.SYSTEM.lookup(hostname)
-            val ipv4 = addresses.filterIsInstance<Inet4Address>()
-            if (ipv4.isNotEmpty()) return ipv4
-            throw UnknownHostException("No IPv4 address for $hostname")
-        }
-    }
-
-    private val okHttp: OkHttpClient
-        get() = okHttpLazy.value
+    private val client: UpdateClient by lazy { UpdateClient() }
 
     fun markStarted(nowMs: Long = System.currentTimeMillis()) {
         lastStartedAtMs = nowMs
     }
 
-    fun cooldownLeftMs(nowMs: Long = System.currentTimeMillis()): Long {
-        val left = (lastStartedAtMs + COOLDOWN_MS) - nowMs
-        return left.coerceAtLeast(0)
-    }
+    fun cooldownLeftMs(nowMs: Long = System.currentTimeMillis()): Long =
+        ((lastStartedAtMs + COOLDOWN_MS) - nowMs).coerceAtLeast(0)
 
-    data class ReleaseInfo(
-        val versionName: String,
-        val apkUrl: String,
-        val releaseNotes: String,
-    )
-
-    sealed class Progress {
-        data object Connecting : Progress()
-
-        data class Downloading(
-            val downloadedBytes: Long,
-            val totalBytes: Long?,
-            val bytesPerSecond: Long,
-        ) : Progress() {
-            val percent: Int? =
-                totalBytes?.takeIf { it > 0 }?.let { total ->
-                    ((downloadedBytes.toDouble() / total.toDouble()) * 100.0).roundToInt().coerceIn(0, 100)
-                }
-
-            val hint: String =
-                buildString {
-                    if (totalBytes != null && totalBytes > 0) {
-                        append("${NumberUtils.formatBytes(downloadedBytes)} / ${NumberUtils.formatBytes(totalBytes)}")
-                    } else {
-                        append(NumberUtils.formatBytes(downloadedBytes))
-                    }
-                    if (bytesPerSecond > 0) append("（${NumberUtils.formatBytes(bytesPerSecond)}/s）")
-                }
-        }
-
-        data object Done : Progress()
-
-        data class Retrying(val attempt: Int, val maxAttempts: Int) : Progress()
-    }
-
-    suspend fun fetchLatestRelease(): ReleaseInfo {
-        return withContext(Dispatchers.IO) {
-            var lastError: Throwable? = null
-            val maxAttempts = 3
-            for (attempt in 1..maxAttempts) {
-                ensureActive()
-                try {
-                    return@withContext fetchLatestReleaseOnce()
-                } catch (t: Throwable) {
-                    if (t is CancellationException) throw t
-                    lastError = t
-                    val shouldRetry =
-                        attempt < maxAttempts &&
-                            (t is IOException || t.message?.startsWith("HTTP ") == true)
-                    if (!shouldRetry) throw t
-                    delay((400L * attempt).milliseconds)
-                }
-            }
-            throw lastError ?: IllegalStateException("fetch latest release failed")
-        }
-    }
-
-    private fun fetchLatestReleaseOnce(): ReleaseInfo {
-        val req = Request.Builder()
-            .url(RELEASE_API_URL)
-            .header("Accept", "application/vnd.github+json")
-            .get()
-            .build()
-        val call = okHttp.newCall(req)
-        val res = call.execute()
-        res.use { r ->
-            check(r.isSuccessful) { "HTTP ${r.code} ${r.message}" }
-            val body = r.body ?: error("empty body")
-            val json = JSONObject(body.string())
-
-            val tagName = json.optString("tag_name", "").trim().removePrefix("v")
-            check(tagName.isNotBlank()) { "Release tag_name 为空" }
-            check(parseVersion(tagName) != null) { "版本号格式不正确：$tagName" }
-
-            val releaseNotes = json.optString("body", "").trim()
-
-            // Release 同时挂着 release/debug 两个包，assets 顺序不保证（并行上传），
-            // 必须显式挑 release 包，否则可能把 debug 包推给用户
-            val assets = json.optJSONArray("assets") ?: error("没有找到附件")
-            var releaseApkUrl = ""
-            var fallbackApkUrl = ""
-            for (i in 0 until assets.length()) {
-                val asset = assets.getJSONObject(i)
-                val name = asset.optString("name", "")
-                if (!name.endsWith(".apk", ignoreCase = true)) continue
-                if (name.endsWith("-debug.apk", ignoreCase = true)) continue
-                val url = asset.optString("browser_download_url", "")
-                if (url.isBlank()) continue
-                if (name.endsWith("-release.apk", ignoreCase = true)) {
-                    releaseApkUrl = url
-                    break
-                }
-                if (fallbackApkUrl.isBlank()) fallbackApkUrl = url
-            }
-            val apkUrl = releaseApkUrl.ifBlank { fallbackApkUrl }
-            check(apkUrl.isNotBlank()) { "Release 中没有找到 APK 文件" }
-
-            return ReleaseInfo(
-                versionName = tagName,
-                apkUrl = apkUrl,
-                releaseNotes = releaseNotes,
-            )
-        }
-    }
-
-    fun isRemoteNewer(
-        remoteVersionName: String,
-        currentVersionName: String = BuildConfig.VERSION_NAME,
-    ): Boolean {
-        val remote = parseVersion(remoteVersionName) ?: return false
-        val current = parseVersion(currentVersionName)
-            ?: return remoteVersionName.trim() != currentVersionName.trim()
-        return compareVersion(remote, current) > 0
+    suspend fun check(context: Context): UpdateClient.CheckResult {
+        val app = context.applicationContext
+        return client.check(
+            expectedPackage = app.packageName,
+            installedVersionCode = ApkVerifier.installedVersionCode(app),
+            deviceSdk = Build.VERSION.SDK_INT,
+        )
     }
 
     /**
-     * 启动时清理上一次会话遗留的安装包。下载→拉起安装器都在同一次会话内完成，
-     * 没有任何跨进程复用残留包的路径，残留在磁盘上只会白占缓存空间（几十 MB），
-     * 因此启动时整目录删除即可；下次下载会在同目录重建，不影响更新流程。
+     * 下載並驗證；成功時回傳 `update/ready/` 裡可以直接安裝的檔案。
+     * 驗證失敗丟出 [UpdateException]（[UpdateException.Reason.REJECTED] 帶有 [UpdatePolicy.Rejection]），
+     * 不會留下任何可安裝的檔案。
      */
-    fun cleanupStaleDownload(context: Context) {
-        Thread {
-            val dir = File(context.applicationContext.cacheDir, UPDATE_DIR_NAME)
-            if (!dir.exists()) return@Thread
-            val deleted = dir.deleteRecursively()
-            AppLog.i(TAG, "cleanupStaleDownload dir=$dir deleted=$deleted")
-        }.apply { isDaemon = true }.start()
+    suspend fun downloadAndVerify(
+        context: Context,
+        candidate: UpdateClient.Candidate,
+        onProgress: (UpdateClient.Progress) -> Unit,
+    ): File {
+        val app = context.applicationContext
+        val root = File(app.filesDir, UPDATE_DIR)
+        val staging = File(root, "staging")
+        val ready = File(root, "ready")
+        withContext(Dispatchers.IO) {
+            staging.deleteRecursively()
+            if (!staging.mkdirs() && !staging.isDirectory) storageError("無法建立 $staging")
+        }
+        val part = File(staging, "${candidate.versionCode}.apk")
+        client.download(candidate, part, onProgress)
+
+        return withContext(Dispatchers.IO) {
+            val facts = ApkVerifier.readArchiveFacts(app, part)
+            val rejection = UpdatePolicy.evaluateApk(
+                facts = facts,
+                metadata = candidate.metadata,
+                expectedPackage = app.packageName,
+                installedVersionCode = ApkVerifier.installedVersionCode(app),
+                expectedSigners = UpdatePolicy.expectedSigners(ApkVerifier.installedSigners(app)),
+                deviceSdk = Build.VERSION.SDK_INT,
+            )
+            if (rejection != null) {
+                part.delete()
+                AppLog.w(TAG, "rejected ${candidate.versionName}: $rejection facts=$facts")
+                throw UpdateException(UpdateException.Reason.REJECTED, "安裝檔驗證失敗：$rejection", rejection = rejection)
+            }
+            ready.deleteRecursively()
+            if (!ready.mkdirs() && !ready.isDirectory) {
+                part.delete()
+                storageError("無法建立 $ready")
+            }
+            val target = File(ready, "${candidate.versionCode}-${candidate.metadata.sha256.take(8)}.apk")
+            if (!part.renameTo(target)) {
+                part.delete()
+                target.delete()
+                storageError("無法移動安裝檔")
+            }
+            AppLog.i(TAG, "verified ${candidate.versionName} (${candidate.versionCode}) -> ${target.name}")
+            target
+        }
     }
 
-    suspend fun downloadApkToCache(
-        context: Context,
-        url: String,
-        onProgress: (Progress) -> Unit,
-    ): File {
-        var lastError: Throwable? = null
-        val maxAttempts = 3
-        for (attempt in 1..maxAttempts) {
-            currentCoroutineContext().ensureActive()
-            if (attempt == 1) onProgress(Progress.Connecting)
-            try {
-                return downloadApkToCacheOnce(context, url, onProgress)
-            } catch (t: Throwable) {
-                if (t is CancellationException) throw t
-                lastError = t
-                if (attempt < maxAttempts) {
-                    onProgress(Progress.Retrying(attempt, maxAttempts))
-                    delay((1_500L * attempt).milliseconds)
-                }
-            }
-        }
-        throw lastError ?: IllegalStateException("download failed")
-    }
+    /** API 26 起需要「安裝不明應用程式」權限；API 23–25 由系統安裝程式自己詢問。 */
+    fun canInstallPackages(context: Context): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
 
-    private suspend fun downloadApkToCacheOnce(
-        context: Context,
-        url: String,
-        onProgress: (Progress) -> Unit,
-    ): File {
-        val dir = File(context.cacheDir, UPDATE_DIR_NAME).apply { mkdirs() }
-        val part = File(dir, "update.apk.part")
-        val target = File(dir, "update.apk")
-        runCatching { part.delete() }
-        runCatching { target.delete() }
-
-        val req = Request.Builder().url(url).get().build()
-        val call = okHttp.newCall(req)
-        val res = call.execute()
-        res.use { r ->
-            check(r.isSuccessful) { "HTTP ${r.code} ${r.message}" }
-            val body = r.body ?: error("empty body")
-            val total = body.contentLength().takeIf { it > 0 }
-            withContext(Dispatchers.IO) {
-                body.byteStream().use { input ->
-                    FileOutputStream(part).use { output ->
-                        val buf = ByteArray(32 * 1024)
-                        var downloaded = 0L
-
-                        var lastEmitAtMs = 0L
-                        var speedAtMs = System.currentTimeMillis()
-                        var speedBytes = 0L
-                        var bytesPerSecond = 0L
-
-                        while (true) {
-                            ensureActive()
-                            val read = input.read(buf)
-                            if (read <= 0) break
-                            output.write(buf, 0, read)
-                            downloaded += read
-
-                            speedBytes += read
-                            val nowMs = System.currentTimeMillis()
-                            val speedElapsedMs = nowMs - speedAtMs
-                            if (speedElapsedMs >= 1_000) {
-                                bytesPerSecond =
-                                    (speedBytes * 1_000L / speedElapsedMs.coerceAtLeast(1)).coerceAtLeast(0)
-                                speedBytes = 0L
-                                speedAtMs = nowMs
-                            }
-
-                            if (nowMs - lastEmitAtMs >= 200) {
-                                lastEmitAtMs = nowMs
-                                onProgress(
-                                    Progress.Downloading(
-                                        downloadedBytes = downloaded,
-                                        totalBytes = total,
-                                        bytesPerSecond = bytesPerSecond,
-                                    )
-                                )
-                            }
-                        }
-                        output.fd.sync()
-                    }
-                }
-            }
-        }
-
-        check(part.exists() && part.length() > 0) { "downloaded file is empty" }
-        check(part.renameTo(target)) { "rename failed" }
-        return target
+    /** 開啟本 App 的「安裝不明應用程式」設定頁；裝置沒有這個頁面（例如當貝）時回傳 null。 */
+    fun unknownSourcesSettingsIntent(context: Context): Intent? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+        val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
+        return intent.takeIf { it.resolveActivity(context.packageManager) != null }
     }
 
     fun installApk(context: Context, apkFile: File) {
-        val authority = "${context.packageName}.fileprovider"
-        val uri = FileProvider.getUriForFile(context, authority, apkFile)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            addCategory(Intent.CATEGORY_DEFAULT)
             setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            clipData = ClipData.newRawUri(apkFile.name, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
     }
 
-    private fun parseVersion(raw: String): List<Int>? {
-        val cleaned = raw.trim().removePrefix("v")
-        val digitsOnly = cleaned.takeWhile { ch -> ch.isDigit() || ch == '.' }
-        if (digitsOnly.isBlank()) return null
-        val parts = digitsOnly.split('.').filter { it.isNotBlank() }
-        if (parts.isEmpty()) return null
-        return parts.map { it.toIntOrNull() ?: return null }
+    /**
+     * 啟動時清理：刪掉下載到一半的檔案、舊版留在 cacheDir 的安裝檔；
+     * ready/ 只保留 24 小時內的（安裝程式可能還在讀）。不連網。
+     */
+    fun cleanupStaleDownload(context: Context) {
+        val app = context.applicationContext
+        Thread {
+            runCatching {
+                File(app.cacheDir, UPDATE_DIR).takeIf { it.exists() }?.deleteRecursively()
+                val root = File(app.filesDir, UPDATE_DIR)
+                File(root, "staging").takeIf { it.exists() }?.deleteRecursively()
+                val now = System.currentTimeMillis()
+                File(root, "ready").listFiles()?.forEach { f ->
+                    if (now - f.lastModified() > READY_KEEP_MS) f.delete()
+                }
+            }.onFailure { AppLog.w(TAG, "cleanupStaleDownload failed: $it") }
+        }.apply { isDaemon = true }.start()
     }
 
-    private fun compareVersion(a: List<Int>, b: List<Int>): Int {
-        val max = maxOf(a.size, b.size)
-        for (i in 0 until max) {
-            val ai = a.getOrElse(i) { 0 }
-            val bi = b.getOrElse(i) { 0 }
-            if (ai != bi) return ai.compareTo(bi)
-        }
-        return 0
-    }
+    private fun storageError(message: String): Nothing =
+        throw UpdateException(UpdateException.Reason.STORAGE, message)
 }

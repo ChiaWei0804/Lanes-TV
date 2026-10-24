@@ -372,6 +372,15 @@
     <string name="update_latest_format">已是最新版（%1$s）</string>
     <string name="update_new_version_format">新版本 %1$s</string>
     <string name="update_check_failed">檢查失敗</string>
+    <!-- [btr-hardening] 應用內更新 -->
+    <string name="update_err_rate_limited">GitHub 暫時限制查詢，請稍後再試</string>
+    <string name="update_err_no_release">找不到可用的正式版</string>
+    <string name="update_err_incomplete">發佈清單太長，無法完整檢查</string>
+    <string name="update_err_bad_release">發佈內容格式不正確</string>
+    <string name="update_err_storage">無法寫入安裝檔，請檢查儲存空間</string>
+    <string name="update_err_rejected_format">安裝檔驗證失敗（%1$s），已停止更新</string>
+    <string name="update_need_install_permission">請允許本 App 安裝不明應用程式，返回後會繼續更新</string>
+    <string name="update_install_permission_denied">沒有取得安裝權限，已取消更新</string>
     <string name="log_enabled_toast">日誌記錄：%1$s</string>
 
     <!-- ===== 多語言：風控驗證 ===== -->

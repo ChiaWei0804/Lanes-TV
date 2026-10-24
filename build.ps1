@@ -1,4 +1,4 @@
-﻿# MyTVB-Speed-Boost (btr-hardening) 一鍵編譯腳本
+﻿# Lanes-TV 一鍵編譯腳本
 # 用法：在 PowerShell 執行
 #   powershell -ExecutionPolicy Bypass -File .\build.ps1
 # 第一次執行會建立簽章金鑰 keystore\mytvb-release.p12，請務必備份該檔與密碼。
@@ -78,8 +78,9 @@ if ($LASTEXITCODE -ne 0) { throw "編譯失敗。請把上面的錯誤訊息整�
 $out = Join-Path $Root "output"
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 Get-ChildItem "$Root\app\build\outputs\apk\release\*.apk" | ForEach-Object {
-    Copy-Item $_.FullName (Join-Path $out "MyTVB-BTR-hardened.apk") -Force
+    Copy-Item $_.FullName (Join-Path $out "Lanes-TV.apk") -Force
 }
 Write-Host ""
-Write-Host "完成：$out\MyTVB-BTR-hardened.apk" -ForegroundColor Green
-Write-Host "安裝到電視：adb connect <電視IP>:5555 ； adb install -r `"$out\MyTVB-BTR-hardened.apk`""
+Write-Host "完成：$out\Lanes-TV.apk" -ForegroundColor Green
+Write-Host "安裝到電視：adb connect <電視IP>:5555 ； adb install -r `"$out\Lanes-TV.apk`""
+Write-Host "發佈新版（電視可在 App 內更新）：powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1 -Notes `"更新內容`""

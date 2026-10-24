@@ -116,3 +116,6 @@ app/debug/output-metadata.json
 keystore/
 output/
 local.properties
+
+# ========== 應用內更新驗證測試檔（tools/updater-fixtures/make-fixtures.ps1 產生） ==========
+app/src/androidTest/assets/updater/

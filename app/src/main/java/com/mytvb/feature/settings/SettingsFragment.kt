@@ -27,6 +27,8 @@ import com.mytvb.BuildConfig
 import com.mytvb.R
 import com.mytvb.core.common.media.VideoCodecSupport
 import com.mytvb.core.common.update.ApkUpdater
+import com.mytvb.core.common.update.UpdateClient
+import com.mytvb.core.common.update.UpdateException
 import com.mytvb.databinding.FragmentSettingsBinding
 import com.mytvb.model.SettingModel
 import com.mytvb.ui.adapter.SettingAdapter
@@ -199,7 +201,8 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
     private val appSettings: AppSettingsDataStore by inject()
     private val cookieManager: CookieManager by inject()
 
-    private val updateScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // [btr-hardening] onDestroyView 會取消這個 scope；改成 var 並重建，Fragment 重新建立 View 後背景工作才不會失效
+    private var updateScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val updateCheckState = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
     private var downloadJob: Job? = null
 
@@ -251,6 +254,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         super.onResume()
         requestInitialCategoryFocus()
         updateRiskControlStatus()
+        resumePendingInstall()
     }
 
     /** 构造存储型条目：value=稳定存储值，info=本地化显示文案。 */
@@ -389,8 +393,9 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         // 关于：应用 / 组件 / 诊断 / 设备信息
         aboutGroups = listOf(
             SettingGroup(R.string.setting_group_about_app, listOf(
-                // [btr-hardening] 移除「檢查更新」（原本指向上游 qianxuntudou-ops/MyBili，簽章不同無法覆蓋安裝）
-                plain(KEY_APP_VERSION, R.string.app_version, BuildConfig.VERSION_NAME)
+                plain(KEY_APP_VERSION, R.string.app_version, BuildConfig.VERSION_NAME),
+                // [btr-hardening] 「檢查更新」改查本 fork 的 GitHub Releases，並驗證安裝檔簽章（見 ApkUpdater）
+                plain(KEY_CHECK_UPDATE, R.string.check_update, getString(R.string.update_click_to_check))
             )),
             // [btr-hardening] 移除「X5 內核」元件組（僅電視直播使用，該功能已停用）
             SettingGroup(R.string.setting_group_diagnostics, listOf(
@@ -677,8 +682,9 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
             }
             KEY_PSAS_INTERVAL -> showPsasIntervalChoiceDialog()
             // —— 关于 ——
-            // [btr-hardening] 檢查更新與 X5 下載已停用（設定項已移除，這裡再擋一次）
-            KEY_CHECK_UPDATE, KEY_X5_CORE -> Unit
+            KEY_CHECK_UPDATE -> checkForUpdate()
+            // [btr-hardening] X5 下載已停用（設定項已移除，這裡再擋一次）
+            KEY_X5_CORE -> Unit
             KEY_LOG_RECORD -> {
                 val newValue = if (AppLog.isEnabled) "关" else "开"
                 AppLog.setEnabled(newValue == "开")
@@ -909,9 +915,15 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         }
     }
 
-    private var cachedReleaseInfo: ApkUpdater.ReleaseInfo? = null
+    /**
+     * [btr-hardening] 等使用者在系統設定允許「安裝不明應用程式」後要繼續的更新。
+     * 回到這頁時（onResume）再檢查一次權限，不依賴設定頁的回傳結果。
+     */
+    private var pendingInstallCandidate: UpdateClient.Candidate? = null
 
+    // [btr-hardening] 只查本 fork 的 GitHub Releases；對話框和下載都綁定同一個不可變的 Candidate
     private fun checkForUpdate() {
+        if (updateCheckState.value is UpdateCheckState.Checking || downloadJob?.isActive == true) return
         val cooldown = ApkUpdater.cooldownLeftMs()
         if (cooldown > 0) {
             Toast.makeText(requireContext(), getString(R.string.toast_try_later), Toast.LENGTH_SHORT).show()
@@ -923,19 +935,22 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
 
         updateScope.launch {
             try {
-                val releaseInfo = ApkUpdater.fetchLatestRelease()
-                cachedReleaseInfo = releaseInfo
-                if (ApkUpdater.isRemoteNewer(releaseInfo.versionName)) {
-                    updateCheckState.value = UpdateCheckState.UpdateAvailable(releaseInfo.versionName)
-                    updateUpdateEntry()
-                    showUpdateConfirmDialog(releaseInfo)
-                } else {
-                    updateCheckState.value = UpdateCheckState.Latest(releaseInfo.versionName)
-                    updateUpdateEntry()
+                when (val result = ApkUpdater.check(requireContext())) {
+                    is UpdateClient.CheckResult.Available -> {
+                        updateCheckState.value = UpdateCheckState.UpdateAvailable(result.candidate.versionName)
+                        updateUpdateEntry()
+                        showUpdateConfirmDialog(result.candidate)
+                    }
+                    is UpdateClient.CheckResult.UpToDate -> {
+                        updateCheckState.value = UpdateCheckState.Latest(BuildConfig.VERSION_NAME)
+                        updateUpdateEntry()
+                    }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 AppLog.e("SettingsFragment", "check update failed", e)
-                val msg = e.message ?: getString(R.string.unknown_error)
+                val msg = updateErrorMessage(e)
                 updateCheckState.value = UpdateCheckState.Error(msg)
                 updateUpdateEntry()
                 Toast.makeText(
@@ -960,7 +975,26 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         refreshItem(KEY_CHECK_UPDATE)
     }
 
-    private fun showUpdateConfirmDialog(releaseInfo: ApkUpdater.ReleaseInfo) {
+    /** [btr-hardening] 依錯誤原因顯示可理解的訊息（不直接顯示例外字串）。 */
+    private fun updateErrorMessage(e: Throwable): String {
+        if (e !is UpdateException) return getString(R.string.unknown_error)
+        return when (e.reason) {
+            UpdateException.Reason.NETWORK -> getString(R.string.net_error_toast)
+            UpdateException.Reason.RATE_LIMITED -> getString(R.string.update_err_rate_limited)
+            UpdateException.Reason.NOT_FOUND,
+            UpdateException.Reason.NO_RELEASE -> getString(R.string.update_err_no_release)
+            UpdateException.Reason.INCOMPLETE -> getString(R.string.update_err_incomplete)
+            UpdateException.Reason.STORAGE -> getString(R.string.update_err_storage)
+            UpdateException.Reason.REJECTED ->
+                getString(R.string.update_err_rejected_format, e.rejection?.name ?: e.message.orEmpty())
+            UpdateException.Reason.BAD_RESPONSE,
+            UpdateException.Reason.BAD_METADATA,
+            UpdateException.Reason.DISALLOWED_URL,
+            UpdateException.Reason.TOO_LARGE -> getString(R.string.update_err_bad_release)
+        }
+    }
+
+    private fun showUpdateConfirmDialog(candidate: UpdateClient.Candidate) {
         val px40 = resources.getDimensionPixelSize(R.dimen.px40)
         val px35 = resources.getDimensionPixelSize(R.dimen.px35)
         val px20 = resources.getDimensionPixelSize(R.dimen.px20)
@@ -1000,13 +1034,13 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         })
 
         root.addView(ScaledTextView(requireContext()).apply {
-            val notes = if (releaseInfo.releaseNotes.isNotBlank()) {
-                getString(R.string.update_release_notes_format, releaseInfo.releaseNotes.take(300))
+            val notes = if (candidate.notes.isNotBlank()) {
+                getString(R.string.update_release_notes_format, candidate.notes.take(300))
             } else ""
             text = getString(
                 R.string.update_confirm_message_format,
                 BuildConfig.VERSION_NAME,
-                releaseInfo.versionName,
+                candidate.versionName,
                 notes
             )
             setTextColor(textColor)
@@ -1027,8 +1061,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
 
         listOf(getString(R.string.cancel) to { dialog.dismiss() }, getString(R.string.update_download_action) to {
             dialog.dismiss()
-            val apkUrl = cachedReleaseInfo?.apkUrl
-            if (apkUrl != null) startDownloadApk(apkUrl)
+            startDownloadWhenAllowed(candidate)
         }).forEach { (text, action) ->
             actionContainer.addView(ScaledTextView(requireContext()).apply {
                 this.text = text
@@ -1050,7 +1083,42 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         DialogWindowFit.apply(dialog.window, requireContext(), resources.getDimensionPixelSize(R.dimen.px800))
     }
 
-    private fun startDownloadApk(apkUrl: String) {
+    /**
+     * [btr-hardening] API 26 起要先允許「安裝不明應用程式」，否則下載完也裝不了。
+     * 有設定頁就先帶使用者過去，回來後（onResume）自動繼續；沒有設定頁的系統（例如當貝）
+     * 直接下載，交給系統安裝程式自己詢問。
+     */
+    private fun startDownloadWhenAllowed(candidate: UpdateClient.Candidate) {
+        val context = requireContext()
+        if (!ApkUpdater.canInstallPackages(context)) {
+            val settings = ApkUpdater.unknownSourcesSettingsIntent(context)
+            if (settings != null) {
+                pendingInstallCandidate = candidate
+                Toast.makeText(context, getString(R.string.update_need_install_permission), Toast.LENGTH_LONG).show()
+                runCatching { startActivity(settings) }.onFailure {
+                    pendingInstallCandidate = null
+                    startDownloadApk(candidate)
+                }
+                return
+            }
+        }
+        startDownloadApk(candidate)
+    }
+
+    private fun resumePendingInstall() {
+        val candidate = pendingInstallCandidate ?: return
+        pendingInstallCandidate = null
+        if (ApkUpdater.canInstallPackages(requireContext())) {
+            startDownloadApk(candidate)
+        } else {
+            Toast.makeText(requireContext(), getString(R.string.update_install_permission_denied), Toast.LENGTH_LONG).show()
+            updateCheckState.value = UpdateCheckState.Idle
+            updateUpdateEntry()
+        }
+    }
+
+    private fun startDownloadApk(candidate: UpdateClient.Candidate) {
+        if (downloadJob?.isActive == true) return
         val px40 = resources.getDimensionPixelSize(R.dimen.px40)
         val px35 = resources.getDimensionPixelSize(R.dimen.px35)
         val px20 = resources.getDimensionPixelSize(R.dimen.px20)
@@ -1131,40 +1199,41 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
 
         downloadJob = updateScope.launch {
             try {
-                val apkFile = withContext(Dispatchers.IO) {
-                    ApkUpdater.downloadApkToCache(requireContext(), apkUrl) { progress ->
-                        view?.post {
-                            if (!isAdded) return@post
-                            when (progress) {
-                                is ApkUpdater.Progress.Connecting -> {
-                                    progressText.text = getString(R.string.connecting)
-                                    progressBar.isIndeterminate = true
+                val apkFile = ApkUpdater.downloadAndVerify(requireContext(), candidate) { progress ->
+                    view?.post {
+                        if (!isAdded) return@post
+                        when (progress) {
+                            is UpdateClient.Progress.Connecting -> {
+                                progressText.text = getString(R.string.connecting)
+                                progressBar.isIndeterminate = true
+                            }
+                            is UpdateClient.Progress.Downloading -> {
+                                progressBar.isIndeterminate = false
+                                progressBar.progress = progress.percent
+                                progressText.text = buildString {
+                                    append("${NumberUtils.formatBytes(progress.downloadedBytes)} / ${NumberUtils.formatBytes(progress.totalBytes)}")
+                                    if (progress.bytesPerSecond > 0) append("（${NumberUtils.formatBytes(progress.bytesPerSecond)}/s）")
                                 }
-                                is ApkUpdater.Progress.Downloading -> {
-                                    progressBar.isIndeterminate = false
-                                    progress.percent?.let { progressBar.progress = it }
-                                    progressText.text = progress.hint
-                                }
-                                is ApkUpdater.Progress.Done -> {}
-                                is ApkUpdater.Progress.Retrying -> {
-                                    progressText.text = getString(R.string.retrying_format, progress.attempt, progress.maxAttempts)
-                                    progressBar.isIndeterminate = true
-                                }
+                            }
+                            is UpdateClient.Progress.Retrying -> {
+                                progressText.text = getString(R.string.retrying_format, progress.attempt, progress.maxAttempts)
+                                progressBar.isIndeterminate = true
                             }
                         }
                     }
                 }
                 dialog.dismiss()
+                updateCheckState.value = UpdateCheckState.Idle
+                updateUpdateEntry()
                 ApkUpdater.installApk(requireContext(), apkFile)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) return@launch
                 dialog.dismiss()
                 AppLog.e("SettingsFragment", "download apk failed", e)
-                val hint = when (e) {
-                    is java.net.SocketTimeoutException -> getString(R.string.net_timeout_toast)
-                    is java.net.UnknownHostException -> getString(R.string.net_unavailable_toast)
-                    is java.io.IOException -> getString(R.string.net_error_toast)
-                    else -> getString(R.string.download_failed_toast)
+                val hint = if (e is UpdateException && e.reason == UpdateException.Reason.NETWORK) {
+                    getString(R.string.download_failed_toast)
+                } else {
+                    updateErrorMessage(e)
                 }
                 Toast.makeText(requireContext(), hint, Toast.LENGTH_LONG).show()
                 updateCheckState.value = UpdateCheckState.Idle
@@ -1177,6 +1246,9 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>() {
         super.onDestroyView()
         downloadJob?.cancel()
         updateScope.cancel()
+        updateScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        // [btr-hardening] 被取消的檢查不會再回報結果，狀態不重設的話之後按「檢查更新」會一直被擋
+        if (updateCheckState.value is UpdateCheckState.Checking) updateCheckState.value = UpdateCheckState.Idle
     }
 
     private fun clearCache() {

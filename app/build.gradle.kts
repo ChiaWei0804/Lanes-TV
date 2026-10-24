@@ -65,8 +65,10 @@ android {
         applicationId = (project.findProperty("applicationId") as? String) ?: "com.mytvb.btr"
         minSdk = 23
         targetSdk = 35
-        versionCode = 103
-        versionName = "2.0.9-btr.11-hardened.7"
+        // [btr-hardening] Lanes-TV 改用 X.Y.Z；versionCode 延續原本的序號（hardened.7 = 103）。
+        // 應用內更新以 versionCode 判斷新舊，tag 和 versionName 必須是 vX.Y.Z / X.Y.Z（見 RELEASING.md）
+        versionCode = 104
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -90,14 +92,9 @@ android {
         }
 
         release {
-            // CI supplies one long-lived keystore through environment variables so
-            // successive APKs remain installable updates instead of signature conflicts.
-            signingConfig = if (hasReleaseSigning) {
-                signingConfigs.getByName("release")
-            } else {
-                // Keep local builds convenient; CI fails fast if its signing secrets are absent.
-                signingConfigs.getByName("debug")
-            }
+            // [btr-hardening] 不再退回 debug 金鑰：沒有正式金鑰時 packageRelease 直接失敗（見檔尾），
+            // 避免做出 debug 簽章的「正式版」。應用內更新也只接受正式金鑰簽的安裝檔。
+            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -233,7 +230,7 @@ androidComponents {
         val renameTask = tasks.register("rename${capitalizedVariantName}Apk", RenameApkTask::class) {
             apkDirectory.set(variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.APK))
             renamedApkDirectory.set(layout.buildDirectory.dir("outputs/renamed_apk/${variant.name}"))
-            appName.set("MyTVB")
+            appName.set("Lanes-TV")
             buildType.set(variant.buildType)
             versionName.set(variant.outputs.single().versionName)
         }
@@ -305,7 +302,9 @@ dependencies {
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.robolectric:robolectric:4.14.1")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.1.5")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    // [btr-hardening] 3.1.5 不存在於 Maven，instrumented 測試原本無法編譯
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
 
 
@@ -321,4 +320,16 @@ val fixDebugSourceSetPathMap by tasks.registering(FixSourceSetPathMapTask::class
 
 tasks.matching { it.name == "mergeDebugResources" }.configureEach {
     dependsOn(fixDebugSourceSetPathMap)
+}
+
+// [btr-hardening] 沒有正式簽章設定就不准打包 release（原本會默默改用 debug 金鑰）
+tasks.matching { it.name == "packageRelease" }.configureEach {
+    doFirst {
+        if (!hasReleaseSigning) {
+            throw GradleException(
+                "Release 簽章未設定：請用 build.ps1 編譯，或設好 RELEASE_STORE_FILE / RELEASE_STORE_PASSWORD / " +
+                    "RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD。"
+            )
+        }
+    }
 }

@@ -372,6 +372,15 @@
     <string name="update_latest_format">Up to date (%1$s)</string>
     <string name="update_new_version_format">New version %1$s</string>
     <string name="update_check_failed">Check failed</string>
+    <!-- [btr-hardening] in-app update -->
+    <string name="update_err_rate_limited">GitHub is rate limiting requests, try again later</string>
+    <string name="update_err_no_release">No stable release found</string>
+    <string name="update_err_incomplete">Release list too long to check completely</string>
+    <string name="update_err_bad_release">The release is malformed</string>
+    <string name="update_err_storage">Could not save the update, check free storage</string>
+    <string name="update_err_rejected_format">Update failed verification (%1$s) and was discarded</string>
+    <string name="update_need_install_permission">Allow this app to install unknown apps; the update continues when you return</string>
+    <string name="update_install_permission_denied">Install permission not granted, update cancelled</string>
     <string name="log_enabled_toast">Logging: %1$s</string>
 
     <!-- ===== Risk control verification ===== -->

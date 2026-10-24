@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- [btr-hardening] 只分享已驗證完成、等待安裝的安裝檔（filesDir/update/ready），不分享下載中的暫存檔 -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <cache-path
-        name="update_cache"
-        path="update/" />
+    <files-path
+        name="update_ready"
+        path="update/ready/" />
 </paths>

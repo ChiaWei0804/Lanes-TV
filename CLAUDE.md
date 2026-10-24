@@ -36,11 +36,12 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 
 - **正式版（要裝到電視的）**：`powershell -ExecutionPolicy Bypass -File .\build.ps1`
   - 腳本會互動式詢問簽章密碼，**請讓使用者自己輸入**，不要要求、記錄或寫進任何檔案
-  - 輸出：`output\MyTVB-BTR-hardened.apk`
+  - 輸出：`output\Lanes-TV.apk`
   - 如果使用者已在環境變數設好 `RELEASE_STORE_FILE / RELEASE_STORE_PASSWORD / RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD`，也可以直接 `.\gradlew.bat :app:assembleRelease --no-daemon`
 - **單元測試**：`.\gradlew.bat :app:testDebugUnitTest --no-daemon`（每次改 BTR 或播放器後先跑）
 - 第一次編譯約 6 分鐘，之後約 1–2 分鐘
-- 每次要裝到電視的版本都要遞增 `app/build.gradle.kts` 的 `versionCode`，`versionName` 用 `2.0.9-btr.11-hardened.N`
+- 每次要裝到電視的版本都要遞增 `app/build.gradle.kts` 的 `versionCode`，`versionName` 用 `X.Y.Z`（1.0.0 = versionCode 104 起）。發佈到 GitHub 讓裝置在 App 內更新：見 `RELEASING.md`（`tools\publish-release.ps1`，要等使用者要求才發佈）
+- **在電視上跑 instrumented 測試一定要加 `-PapplicationId=com.mytvb.btr.updaterprobe`**（`connectedDebugAndroidTest`），否則會把 debug 版裝到 `com.mytvb.btr` 上。更新器的實機測試：先跑 `tools\updater-fixtures\make-fixtures.ps1` 產生測試檔，再加 `-Pandroid.testInstrumentationRunnerArguments.class=com.mytvb.core.common.update.ApkArchiveProbeTest`
 
 ### 簽章金鑰（絕對不能弄錯）
 
@@ -53,7 +54,7 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 - 電視 IP：`192.168.7.52`（Wi-Fi）。無線偵錯的**連接埠每次重開都會變**，要問使用者電視「無線偵錯」畫面上的 IP:埠
 - 斷線後重連：`& $adb connect 192.168.7.52:<埠>`；如果顯示需要配對，請使用者在電視上開「使用配對碼配對」，再執行 `& $adb pair 192.168.7.52:<配對埠> <配對碼>`
 - **一律加 `-s 192.168.7.52:<埠>`**：這台電腦上還有 `emulator-55xx` 之類的其他模擬器，不加會出現 `more than one device`
-- 安裝：`& $adb -s <裝置> install -r output\MyTVB-BTR-hardened.apk`
+- 安裝：`& $adb -s <裝置> install -r output\Lanes-TV.apk`
 - 啟動 App：`& $adb -s <裝置> shell monkey -p com.mytvb.btr -c android.intent.category.LEANBACK_LAUNCHER 1`
 - 模擬遙控器：`& $adb -s <裝置> shell input keyevent <鍵>`，常用 `DPAD_UP / DPAD_DOWN / DPAD_LEFT / DPAD_RIGHT / DPAD_CENTER / BACK / HOME / MENU`
 
@@ -78,7 +79,8 @@ PowerShell 的 `>` 會把二進位檔當文字轉碼，截圖會壞掉。要先�
 
 - **電視直播 / CCTV（Marmot 模組）已停用**：入口隱藏、Activity 從 Manifest 移除、雲端腳本更新停用。原因是 JS 橋能讀到登入 cookie，雲端更新又走明文 HTTP、沒有簽章。**不要重新啟用**，除非先正式修好 JS 橋和雲端更新
 - B 站本身的直播（設定「直播入口」，預設關）和番劇（「分類」頁）都保留
-- 移除設定頁的「檢查更新」（原本指向上游 repo）和「X5 內核」
+- 「檢查更新」改查本 repo 的 Releases 並驗證簽章（`core/common/update/`，見 HARDENING.md「應用內更新」）；移除「X5 內核」
+- App 名稱改為 Lanes-TV（圖示沿用 MyTVB 原圖），套件名稱不變
 - BTR：新增「自動」CDN 模式，並設為預設（海外 + 大陸節點一起測速，同 ChiaWei0804/Lanes 的 Auto）；手動執行緒上限 32
 - 關閉 App 備份，備份排除規則改為實際的 cookie 檔
 - WebView 遠端除錯只在 debug 版開啟
