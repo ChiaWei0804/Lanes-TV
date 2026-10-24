@@ -23,6 +23,7 @@ import android.widget.ImageView
 import androidx.core.content.ContextCompat
 import com.mytvb.R
 import com.mytvb.core.common.log.VideoCardPerfLogger
+import com.mytvb.core.ui.base.UiScale
 import com.mytvb.core.ui.base.UiTextScale
 import pl.droidsonroids.gif.GifDrawable
 import kotlin.math.ceil
@@ -1029,6 +1030,10 @@ private class LightCardMetrics private constructor(context: Context) {
         private val cache = java.util.WeakHashMap<android.content.res.Resources, LightCardMetrics>()
 
         fun get(context: Context): LightCardMetrics {
+            // [btr-hardening] 卡片用程式碼建立，不經過 UiTextScaleFactory 的 inflate 檢查；
+            // 播放器關閉後 density 被系統重設時，這裡不修正就會量出兩倍大的卡片，且被回收重用。
+            UiScale.ensure(context.resources, "lightCard")
+            context.applicationContext?.let { UiScale.ensure(it.resources, "lightCard.application") }
             val resources = context.resources
             val scale = UiTextScale.scale()
             val density = resources.displayMetrics.density
