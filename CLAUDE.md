@@ -35,7 +35,8 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 ## 編譯
 
 - **正式版（要裝到電視的）**：`powershell -ExecutionPolicy Bypass -File .\build.ps1`
-  - 腳本會互動式詢問簽章密碼，**請讓使用者自己輸入**，不要要求、記錄或寫進任何檔案
+  - 腳本會互動式詢問簽章密碼，**請讓使用者自己輸入**，不要在對話中要求、記錄或寫進任何檔案
+  - 使用者可以選擇讓 build.ps1 把密碼用 Windows DPAPI 加密存在 `%LOCALAPPDATA%\Lanes-TV\signing-password.xml`（repo 外）。存了之後 build.ps1 不再詢問，Claude 可以直接執行；**不要讀取、解密、印出或複製這個檔案**。`-ForgetPassword` 會刪除它
   - 輸出：`output\Lanes-TV.apk`
   - 如果使用者已在環境變數設好 `RELEASE_STORE_FILE / RELEASE_STORE_PASSWORD / RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD`，也可以直接 `.\gradlew.bat :app:assembleRelease --no-daemon`
 - **單元測試**：`.\gradlew.bat :app:testDebugUnitTest --no-daemon`（每次改 BTR 或播放器後先跑）

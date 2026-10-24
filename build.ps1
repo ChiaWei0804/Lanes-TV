@@ -2,6 +2,9 @@
 # 用法：在 PowerShell 執行
 #   powershell -ExecutionPolicy Bypass -File .\build.ps1
 # 第一次執行會建立簽章金鑰 keystore\mytvb-release.p12，請務必備份該檔與密碼。
+# 輸入密碼後可選擇加密儲存（%LOCALAPPDATA%\Lanes-TV），之後不必再輸入；加 -ForgetPassword 刪除。
+
+param([switch]$ForgetPassword)
 
 $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
@@ -48,9 +51,56 @@ Write-Host "ANDROID_HOME = $env:ANDROID_HOME"
 $ksDir = Join-Path $Root "keystore"
 $ks = Join-Path $ksDir "mytvb-release.p12"
 $alias = "mytvb"
-$sec = Read-Host "請輸入簽章密碼（第一次執行會用這組密碼建立金鑰，至少 6 個字元）" -AsSecureString
-$pw = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
-if ($pw.Length -lt 6) { throw "密碼至少 6 個字元。" }
+
+# 密碼可以加密存在這台電腦（Windows DPAPI，只有目前的 Windows 帳號能解開），存在 repo 外面
+$pwFile = Join-Path $env:LOCALAPPDATA "Lanes-TV\signing-password.xml"
+if ($ForgetPassword -and (Test-Path $pwFile)) {
+    Remove-Item $pwFile -Force
+    Write-Host "已刪除儲存的簽章密碼。"
+}
+function Test-KeystorePassword([string]$candidate) {
+    $env:LANES_KS_CHECK = $candidate
+    # PowerShell 5.1 在 Stop 模式下會把 keytool 寫到 stderr 的錯誤訊息當成例外
+    $ErrorActionPreference = "Continue"
+    try {
+        & $keytool -list -keystore $ks -storetype PKCS12 -storepass:env LANES_KS_CHECK *> $null
+        return $LASTEXITCODE -eq 0
+    } finally {
+        Remove-Item Env:\LANES_KS_CHECK -ErrorAction SilentlyContinue
+    }
+}
+
+$pw = $null
+if ((Test-Path $pwFile) -and (Test-Path $ks)) {
+    try {
+        $saved = Import-Clixml $pwFile
+        $candidate = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($saved))
+        if (Test-KeystorePassword $candidate) {
+            $pw = $candidate
+            Write-Host "使用儲存的簽章密碼（$pwFile；要刪除請加 -ForgetPassword）"
+        } else {
+            Write-Host "儲存的簽章密碼不正確，已刪除，請重新輸入。" -ForegroundColor Yellow
+            Remove-Item $pwFile -Force
+        }
+    } catch {
+        Write-Host "無法讀取儲存的簽章密碼，請重新輸入。" -ForegroundColor Yellow
+    }
+}
+
+if (-not $pw) {
+    $sec = Read-Host "請輸入簽章密碼（第一次執行會用這組密碼建立金鑰，至少 6 個字元）" -AsSecureString
+    $pw = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
+    if ($pw.Length -lt 6) { throw "密碼至少 6 個字元。" }
+    if (Test-Path $ks) {
+        if (-not (Test-KeystorePassword $pw)) { throw "簽章密碼不正確。" }
+        $answer = Read-Host "要把密碼加密存在這台電腦，以後編譯不用再輸入嗎？(y/N)"
+        if ($answer -match '^[yY]') {
+            New-Item -ItemType Directory -Force -Path (Split-Path $pwFile) | Out-Null
+            $sec | Export-Clixml $pwFile
+            Write-Host "已儲存：$pwFile"
+        }
+    }
+}
 
 if (-not (Test-Path $ks)) {
     New-Item -ItemType Directory -Force -Path $ksDir | Out-Null

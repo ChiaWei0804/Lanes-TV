@@ -48,4 +48,4 @@ Android 8 以上第一次在 App 內更新時，系統會要求允許 Lanes-TV�
 ## 金鑰
 
 - `keystore\mytvb-release.p12` 和密碼一定要備份。遺失後所有裝置都無法更新，只能解除安裝重裝（登入和設定會消失）。
-- 不要把金鑰放到 GitHub（Secrets 也不要）；發佈一律在這台電腦用腳本做。上游的 `release-apk.yml` 已限制只在上游 repo 執行。
+- 不要把金鑰放到 GitHub（Secrets 也不要）；發佈一律在這台電腦用腳本做。本 repo 沒有 GitHub Actions workflow（上游的兩個已移除）。

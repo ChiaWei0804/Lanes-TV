@@ -3,7 +3,7 @@
 基底：nitansde/MyTVB-Speed-Boost `18f99cb`（v2.0.9-btr.11）
 第一版：`2.0.9-btr.11-hardened.1`（之後的版本見文末「後續修改」），套件名稱 `com.mytvb.btr`（可與上游 MyTVB 並存）
 
-完整 diff：`0001-btr-hardening-CCTV-JS-BTR.patch`，或在本資料夾執行 `git show HEAD`。
+完整修改紀錄請看 git 歷史（從 `18f99cb` 之後的 commit）。
 程式碼中所有修改處都標了 `[btr-hardening]`，可直接搜尋。
 
 | 風險 | 處理方式 | 檔案 |
